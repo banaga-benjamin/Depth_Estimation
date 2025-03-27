@@ -6,7 +6,7 @@ from torch.nn import functional
 
 
 class PoseDecoder(nn.Module):
-    def __init__(self, in_channels: int = 512, device: str = 'cpu'):
+    def __init__(self, in_channels: int = 1024, device: str = 'cpu'):
         super( ).__init__( )
         
         self.conv_elu = list( )
@@ -16,10 +16,15 @@ class PoseDecoder(nn.Module):
     
         self.conv = nn.Conv2d(in_channels // 2, 6, kernel_size = (1, 1), stride = (1, 1))
     
-        self.conv.to(device)
-        for conv_elu in self.conv_elu: conv_elu.to(device)
+        self.device = device
+        self.conv.to(self.device)
+        for conv_elu in self.conv_elu: conv_elu.to(self.device)
 
-    def forward(self, input):
+    def forward(self, target_feature, src_feature):
+        # inputs should be of dimensions (C, H, W)
+        input = torch.cat((target_feature, src_feature), dim = 0)
+        input = torch.unsqueeze(input, dim = 0)
+        
         conv_output = input.clone( )
 
         # pass input through convolution - elu layers
@@ -29,7 +34,7 @@ class PoseDecoder(nn.Module):
         conv_output = self.conv(conv_output)
         
         # get mean of features at each channel
-        output = torch.zeros(conv_output.size(dim = 0), conv_output.size(dim = 1))
+        output = torch.zeros(conv_output.size(dim = 0), conv_output.size(dim = 1), device = self.device)
         for batch in range(conv_output.size(dim = 0)):
             for channel in range(conv_output.size(dim = 1)):
                 output[batch][channel] = torch.mean(conv_output[batch][channel])
@@ -41,8 +46,8 @@ class PoseDecoder(nn.Module):
 #    device = 'cuda' if torch.cuda.is_available( ) else 'cpu'
 
 #    H = 192; W = 640
-#    input = torch.rand(1, 512, H // 32, W // 32, device = device)
+#    input = torch.rand(1, 1024, H // 32, W // 32, device = device)
    
    
-#    model = PoseDecoder(device = device); outputs = model(input)
+#    model = PoseDecoder(device = device, in_channels = 1024); outputs = model(input)
 #    for output in outputs: print(output)

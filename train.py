@@ -2,31 +2,75 @@ from time import time
 from os import cpu_count
 
 import dataset
+import func_utils
 from networks import depth_encoder
 from networks import depth_decoder
 from networks import depth_convgru
 
+from networks import pose_encoder
+from networks import pose_decoder
+
 import torch
+import numpy as np
 from torchvision import transforms
 from torch.utils.data import DataLoader
 
 
-def train_step(dataloader: DataLoader, encoder: depth_encoder.DepthEncoder, decoder: depth_decoder.DepthDecoder, convgru: depth_convgru.ConvGru):
+def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_decoder: depth_decoder.DepthDecoder, convgru: depth_convgru.ConvGru,
+                    p_encoder: pose_encoder.PoseEncoder, p_decoder: pose_decoder.PoseDecoder, device: str = "cpu"):
+    # set height, width, and scales to be used
+    H = 192; W = 640
+    scales = [(128, H // 16, W // 16), (64, H // 8, W // 8), 
+              (32, H // 4, W // 4), (16, H // 2, W // 2)]
+
+    # calculate intrinsic matrices
+    intrinsic_mats = list( ); intrinsic_invs = list( )
+
+    k = np.array(
+            [[0.58, 0.00, 0.50, 0.00],
+            [0.00, 1.92, 0.50, 0.00],
+            [0.00, 0.00, 1.00, 0.00],
+            [0.00, 0.00, 0.00, 1.00]],
+            dtype = np.float32
+        )
+
+    for scale in scales:
+        k_copy = k.copy( )
+        _, height, width = scale
+
+        k_copy[0, :] *= width; k_copy[1, :] *= height
+        inv_k = np.linalg.pinv(k_copy)
+
+        intrinsic_mats.append(torch.from_numpy(k_copy))
+        intrinsic_invs.append(torch.from_numpy(inv_k))
+
+        if device == "cuda":
+            intrinsic_mats[-1] = intrinsic_mats[-1].cuda( )
+            intrinsic_invs[-1] = intrinsic_invs[-1].cuda( )
+
     start_time = time( )
     num_batches = len(dataloader.dataset) // dataloader.batch_size
     print("number of batches:", num_batches, "\n")
     for batch, img_batch in enumerate(dataloader):
         for img_seq in img_batch:
-            H = 192; W = 640
-            target_img = torch.unsqueeze(img_seq[-1], dim = 0)
-            encoder_outputs = encoder(target_img)
+            # img_seq dimension is (N, C, H, W)
+            # single img dimension is (C, H, W)
 
+            d_encoder_outputs = d_encoder(img_seq[-1])
             for idx in range(len(img_seq) - 1):
-                cost_volume = [torch.rand(1, 256, H // 16, W // 16, device = device),
-                        torch.rand(1, 128, H // 8, W // 8, device = device),
-                        torch.rand(1, 64, H // 4, W // 4, device = device),
-                        torch.rand(1, 32, H // 2, W // 2, device = device)]
-                convgru(decoder(encoder_outputs, cost_volume))
+                p_encoder_outputs = p_encoder(torch.stack((img_seq[-1], img_seq[idx])))
+                p_decoder_output = p_decoder(p_encoder_outputs[0], p_encoder_outputs[1])
+                pose_mat = func_utils.construct_pose(p_decoder_output).to(device)
+
+                synthesized_imgs = func_utils.synthesize_at_scales(intrinsic_mats, intrinsic_invs, pose_mat, scales, img_seq[idx], device)
+
+                cost_volume = list( )
+                for scale in range(len(synthesized_imgs)):
+                    _, height, width = scales[scale]
+                    resize_img = transforms.Resize(size = (height, width))
+
+                    cost_volume.append(func_utils.cost_volume(resize_img(img_seq[-1]), synthesized_imgs[scale]))
+                depth_outputs = convgru(d_decoder(d_encoder_outputs, cost_volume))
         torch.cuda.empty_cache( )
 
         if batch % 100 == 0:
@@ -58,9 +102,12 @@ if __name__ == "__main__":
                                   persistent_workers = True, shuffle = True, drop_last = True)
     
     convgru = depth_convgru.ConvGru(device = device)
-    encoder = depth_encoder.DepthEncoder(device = device)
-    decoder = depth_decoder.DepthDecoder(device = device)
+    d_encoder = depth_encoder.DepthEncoder(device = device)
+    d_decoder = depth_decoder.DepthDecoder(device = device)
+
+    p_encoder = pose_encoder.PoseEncoder(device = device)
+    p_decoder = pose_decoder.PoseDecoder(device = device)
 
     EPOCHS = 1
     for epoch in range(EPOCHS):
-        with torch.no_grad( ): train_step(train_dataloader, encoder, decoder, convgru)\
+        with torch.no_grad( ): train_step(train_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, device)

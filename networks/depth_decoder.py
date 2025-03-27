@@ -29,7 +29,7 @@ class DepthDecoder(nn.Module):
             if scale != 0:
                 self.compress_layers[0].append((nn.Conv2d(channels * 2, channels, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1))))
                 init.orthogonal_(self.compress_layers[0][-1].weight); init.constant_(self.compress_layers[0][-1].bias, 0.0)
-            self.compress_layers[1].append(nn.Conv2d(channels, channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
+            self.compress_layers[1].append(nn.Conv2d(channels - channels // 4, channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
             init.orthogonal_(self.compress_layers[1][-1].weight); init.constant_(self.compress_layers[1][-1].bias, 0.0)
 
             self.map_layers.append(nn.Conv2d(channels // 4, 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
@@ -48,6 +48,10 @@ class DepthDecoder(nn.Module):
         outputs = list( )
         prev_scale_feature = None
         for scale in range(self.scales):
+            # inputs should be of dimension (N, C, H, W)
+            if input[scale].dim( ) < 4: input[scale] = torch.unsqueeze(input[scale], dim = 0)
+            if cost[scale].dim( ) < 4: cost[scale] = torch.unsqueeze(cost[scale], dim = 0)
+
             if scale != 0:
                 # concatenate input at current scale with previous scale feature
                 output = torch.cat((input[scale], prev_scale_feature), dim = 1); del prev_scale_feature

@@ -24,7 +24,7 @@ class ConvGru(nn.Module):
         self.device = device
         self.prev_states = None
 
-    def forward(self, input):
+    def forward(self, input):        
         # initialize previous states if there are none
         if self.prev_states is None:
             self.prev_states = list( )

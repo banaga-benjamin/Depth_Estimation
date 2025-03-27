@@ -27,6 +27,9 @@ class DepthEncoder(nn.Module):
 
 
     def forward(self, input):
+        # input should be of dimension (N, C, H, W)
+        if input.dim( ) < 4: input = torch.unsqueeze(input, dim = 0)
+        
         outputs = list( )
         # preprocess input before passing to residual layers
         preprocess = self.maxpool(self.relu(self.bn1(self.conv1(input))))

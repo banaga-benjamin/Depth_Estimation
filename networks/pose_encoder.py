@@ -27,6 +27,9 @@ class PoseEncoder(nn.Module):
 
 
     def forward(self, input):
+        # input dimension should be (N, C, H, W)
+        if input.dim( ) < 4: input = torch.unsqueeze(input, dim = 0)
+
         # preprocess input before passing to residual layers
         output = self.maxpool(self.relu(self.bn1(self.conv1(input))))
         output = self.layer1(output)
