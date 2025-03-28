@@ -70,7 +70,6 @@ def synthesize(src_img, proj_pixels):
 
 def synthesize_from_depths(intrinsic_mat, intrinsic_inv, pose_mat, depths, width, height, src_img, device):
     synthesized_imgs = list( )
-
     depths = np.arange(0, 80, 80 / depths)
 
     # for each depth in supplied depths
@@ -103,10 +102,14 @@ def cost_volume(target_img, synthesized_imgs):
 
 
 def construct_pose(pose_vector, device):
+    # flatten pose vector
     pose_vector = torch.squeeze(pose_vector)
+
+    # obtain rotation and translation vectors
     rot_vec = pose_vector[:3]
     trans_vec = pose_vector[3:].view(-1, 1)
 
+    # compute the rotation matrix using scaled rotation axis
     theta = torch.linalg.norm(rot_vec); u = rot_vec / theta
     if theta < 1e-10:  rot_mat = torch.eye(3)
     else:
@@ -114,16 +117,21 @@ def construct_pose(pose_vector, device):
                           [u[2], 0, -u[0]],
                           [-u[1], u[0], 0]]).to(device)
         rot_mat = torch.eye(3).to(device) + torch.sin(theta) * U + (1 - torch.cos(theta)) * torch.matmul(U, U)
+
+    # construct the post matrix from rotation matrix and translation vector
     pose_mat = torch.cat((rot_mat, trans_vec), dim = 1)
     return pose_mat
     
 
 def reprojection_loss(preds, targets):
+    # target and predicted images should be of dimensions (N, C, H, W)
     if targets.dim( ) < 4: targets = targets.unsqueeze(dim = 0)
     if preds.dim( ) < 4: preds = preds.unsqueeze(dim = 0)
 
+    # apply padding to retain dimensions
     x = functional.pad(preds, pad = (1, 1, 1, 1)); y = functional.pad(targets, pad = (1, 1, 1, 1))
 
+    # compute the SSIM loss
     mu_x = functional.avg_pool2d(x, kernel_size = 3, stride = 1)
     mu_y = functional.avg_pool2d(y, kernel_size = 3, stride = 1)
 
@@ -135,10 +143,23 @@ def reprojection_loss(preds, targets):
     SSIM_d = (mu_x ** 2 + mu_y ** 2 + (0.01 ** 2)) * (sigma_x + sigma_y + (0.03 ** 2))
 
     ssim_loss = torch.clamp((1 - SSIM_n / SSIM_d) / 2, 0, 1).mean(dim = 1, keepdim = True)
+
+    # compute L1 loss
     l1_loss = torch.abs(targets - preds).mean(dim = 1, keepdim = True)
 
-    # return 0.05 * ssim_loss + 0.15 * l1_loss
+    # return the mean of the reprojection error
     return (0.05 * ssim_loss + 0.15 * l1_loss).mean( )
+
+
+def regularization_term(depths, target_imgs):
+    # get the gradients along the x and y axes
+    depth_x, depth_y = torch.gradient(depths, dim = (-2, -1))
+    target_x, target_y = torch.gradient(target_imgs, dim = (-2, -1))
+
+    # get the absolute values of the means of the gradients
+    depth_x = depth_x.mean( ).abs( ); depth_y = depth_y.mean( ).abs( )
+    target_x = target_x.mean( ).abs( ); target_y = target_y.mean( ).abs( )
+    return depth_x * torch.exp(-target_x) + depth_y * torch.exp(-target_y)
 
 
 # for debugging

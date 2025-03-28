@@ -40,6 +40,7 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
     for batch, img_batch in enumerate(dataloader):
         target_imgs = list( )   # store target images for computation of reprojection error
         output_imgs = list( )   # store output images for computation of reprojection error
+        depth_outputs = list( ) # store depth outputs for computation of regularization term
         for seq, img_seq in enumerate(img_batch):
             # img_seq dimension is (N, C, H, W)
             # single img dimension is (C, H, W)
@@ -70,6 +71,7 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
                 for idx in range(len(depth_output)): 
                     depth_output[idx] = functional.interpolate(depth_output[idx], size = (192, 640), mode = "bilinear")
                 depth_output = torch.cat(depth_output, dim = 0).mean(dim = 0)
+                depth_outputs.append(depth_output)
                 
                 # synthesize the source image from target image and final depth prediction
                 proj_pixels = func_utils.reproject_from_depth(pose_mat, depth_output, device = device)
@@ -83,8 +85,10 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
         # set optimizer gradients to zero
         for optimizer in optimizers: optimizer.zero_grad( )
 
-        # calculate loss
-        func_utils.reprojection_loss(torch.cat(output_imgs, dim = 0), torch.cat(target_imgs, dim = 0)).backward( )
+        # calculate overall loss
+        overall_loss = func_utils.regularization_term(torch.cat(depth_outputs, dim = 0), torch.cat(target_imgs, dim = 0))
+        overall_loss += func_utils.reprojection_loss(torch.cat(output_imgs, dim = 0), torch.cat(target_imgs, dim = 0))
+        overall_loss.backward( )
 
         # optimize network weights
         for optimizer in optimizers: optimizer.step( )
