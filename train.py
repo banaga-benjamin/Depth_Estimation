@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader
 
 
 def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_decoder: depth_decoder.DepthDecoder, convgru: depth_convgru.ConvGru,
-                    p_encoder: pose_encoder.PoseEncoder, p_decoder: pose_decoder.PoseDecoder, optimizers, device: str = "cpu"):
+                    p_encoder: pose_encoder.PoseEncoder, p_decoder: pose_decoder.PoseDecoder, optimizer, device: str = "cpu"):
     # set height, width, and depths
     # for cost volume calculation
     H = 192; W = 640
@@ -33,7 +33,7 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
 
     intrinsic_mat[0, :] *= cost_width; intrinsic_mat[1, :] *= cost_height
     intrinsic_inv = torch.linalg.pinv(intrinsic_mat)
-
+    
     start_time = time( )
     num_batches = len(dataloader.dataset) // dataloader.batch_size
     print("Number of Batches:", num_batches, "\n")
@@ -82,16 +82,18 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
             output_imgs[seq] = torch.stack(output_imgs[seq], dim = 0)
             target_imgs[seq] = torch.stack(target_imgs[seq], dim = 0)
 
-        # set optimizer gradients to zero
-        for optimizer in optimizers: optimizer.zero_grad( )
-
         # calculate overall loss
         overall_loss = func_utils.regularization_term(torch.cat(depth_outputs, dim = 0), torch.cat(target_imgs, dim = 0))
         overall_loss += func_utils.reprojection_loss(torch.cat(output_imgs, dim = 0), torch.cat(target_imgs, dim = 0))
+
+        # set optimizer gradients to zero
+        optimizer.zero_grad( )
+
+        # perform backward propagation
         overall_loss.backward( )
 
         # optimize network weights
-        for optimizer in optimizers: optimizer.step( )
+        optimizer.step( )
 
         torch.cuda.empty_cache( )
 
@@ -145,13 +147,14 @@ if __name__ == "__main__":
         for name, param in layer.named_parameters( ):
             if param.requires_grad: p_decoder_parameters.append(param)
 
-    optimizers = list( )
-    optimizers.append(torch.optim.SGD(params = convgru_parameters, lr = 0.01))
-    optimizers.append(torch.optim.SGD(params = d_decoder_parameters, lr = 0.01))
-    optimizers.append(torch.optim.SGD(params = p_decoder_parameters, lr = 0.01))
+    optimizer = torch.optim.SGD([
+        {'params': convgru_parameters, 'lr': 1e-3},
+        {'params': d_decoder_parameters, 'lr': 1e-3},
+        {'params': p_decoder_parameters, 'lr': 1e-3}
+    ])
 
     EPOCHS = 1; print("Number of Epochs:", EPOCHS, "\n")
     for epoch in range(EPOCHS):
         print("Current Epoch:", epoch + 1)
         d_decoder.train( ); p_decoder.train( ); convgru.train( )
-        train_step(train_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, optimizers, device)
+        train_step(train_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, optimizer, device)
