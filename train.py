@@ -11,7 +11,7 @@ from networks import pose_encoder
 from networks import pose_decoder
 
 import torch
-import numpy as np
+from torch.nn import functional
 from torchvision import transforms
 from torch.utils.data import DataLoader
 
@@ -38,36 +38,41 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
     num_batches = len(dataloader.dataset) // dataloader.batch_size
     print("Number of Batches:", num_batches, "\n")
     for batch, img_batch in enumerate(dataloader):
-        target_imgs = list( )
-        output_imgs = list( )
+        target_imgs = list( )   # store target images for computation of reprojection error
+        output_imgs = list( )   # store output images for computation of reprojection error
         for seq, img_seq in enumerate(img_batch):
             # img_seq dimension is (N, C, H, W)
             # single img dimension is (C, H, W)
 
             target_imgs.append(list( ))
             output_imgs.append(list( ))
+
+            # obtain depth encoder output from target image
             d_encoder_outputs = d_encoder(img_seq[-1])
             for idx in range(len(img_seq) - 1):
+                # obtain pose matrix relative to current source image
                 p_encoder_outputs = p_encoder(torch.stack((img_seq[-1], img_seq[idx])))
                 p_decoder_output = p_decoder(p_encoder_outputs[0], p_encoder_outputs[1])
                 pose_mat = func_utils.construct_pose(p_decoder_output, device)
 
-                synthesized_imgs = func_utils.synthesize_from_depths(intrinsic_mat, intrinsic_inv, pose_mat, depths, cost_width, cost_height, img_seq[idx], device)
+                # synthesize images for computing cost volume
+                synthesized_imgs = func_utils.synthesize_from_depths(intrinsic_mat, intrinsic_inv, pose_mat, depths,
+                                                                     cost_width, cost_height, img_seq[idx], device).detach( )
 
-                resize_img = transforms.Resize(size = (cost_height, cost_width))
-                cost_volume = func_utils.cost_volume(resize_img(img_seq[-1]), synthesized_imgs)
-                depth_outputs = convgru(d_decoder(d_encoder_outputs, cost_volume))
+                # compute the cost volume relative to source image
+                resized_target_img = functional.interpolate(img_seq[-1].unsqueeze(dim = 0), size = (cost_height, cost_width), mode = "bilinear")
+                cost_volume = func_utils.cost_volume(resized_target_img, synthesized_imgs).detach( )
 
-                # aggregate depth outputs by resizingg to (192, 640)
-                # and taking the average of the sum of depths
-                final_output = torch.zeros(1, 1, 192, 640).to(device)
-                resize_img = transforms.Resize(size = (192, 640))
-                for depth_output in depth_outputs:
-                    depth_output = resize_img(depth_output)
-                    final_output += depth_output
-                final_output /= 4
+                # obtain depth output from depth decoder -> convgru
+                depth_output = convgru(d_decoder(d_encoder_outputs, cost_volume))
 
-                proj_pixels = func_utils.reproject_from_depth(pose_mat, final_output, device = device)
+                # aggregate depth outputs by resizingg to (192, 640) and taking the average of the sum of depths
+                for idx in range(len(depth_output)): 
+                    depth_output[idx] = functional.interpolate(depth_output[idx], size = (192, 640), mode = "bilinear")
+                depth_output = torch.cat(depth_output, dim = 0).mean(dim = 0)
+                
+                # synthesize the source image from target image and final depth prediction
+                proj_pixels = func_utils.reproject_from_depth(pose_mat, depth_output, device = device)
                 output_img = func_utils.synthesize(img_seq[idx], proj_pixels)
 
                 output_imgs[seq].append(output_img.squeeze( ))
