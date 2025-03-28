@@ -4,7 +4,7 @@ from torch.nn import functional
 from torchvision import transforms
 
 
-def reproject(intrinsic_mat, intrinsic_inv, pose_mat, depth_map, width, height, device):
+def reproject_from_depth(intrinsic_mat, intrinsic_inv, pose_mat, depth_map, width, height, device):
     # intrinsic matrices are specified as 4 x 4 matrices
     # suitable for homogenous coordinate transformations
 
@@ -56,62 +56,50 @@ def synthesize(src_img, proj_pixels):
 def synthesize_from_depths(intrinsic_mat, intrinsic_inv, pose_mat, depths, width, height, src_img, device):
     synthesized_imgs = list( )
 
+    depths = np.arange(0, 80, 80 / depths)
+
     # for each depth in supplied depths
     for depth in depths:
         # create a uniform depth map
         depth_map = torch.ones(height, width, device = device) * depth
 
         # project some target image to the source image
-        proj_pixels = reproject(intrinsic_mat, intrinsic_inv, pose_mat, depth_map, width, height, device)
+        proj_pixels = reproject_from_depth(intrinsic_mat, intrinsic_inv, pose_mat, depth_map, width, height, device)
 
         # synthesize the target image
         synthesized_img = synthesize(src_img, proj_pixels)
 
+        # synthesized img should be of dimensions (C, H, W)
+        if synthesized_img.dim( ) > 3: synthesized_img = torch.squeeze(synthesized_img)
         synthesized_imgs.append(synthesized_img)
-    return synthesized_imgs
-
-
-def synthesize_at_scales(intrinsic_mats, intrinsic_invs, pose_mat, scales, src_img, device):
-    outputs = list( )
-    for scale in range(len(scales)):
-        channels, height, width = scales[scale]
-        depths = np.arange(0, 80, 80 / channels)
-        resize_img = transforms.Resize(size = (height, width))
-        src_img_copy = resize_img(src_img)
-        output = synthesize_from_depths(intrinsic_mats[scale], intrinsic_invs[scale], pose_mat, depths, width, height, src_img_copy, device)
-        outputs.append(output)
-    return outputs
+    return torch.stack(synthesized_imgs)
 
 
 def cost_volume(target_img, synthesized_imgs):
     costs = list( )
 
-    # target image dimension should be (C, H, W)
-    if target_img.dim( ) > 3: target_img.squeeze( )
-    for synthesized_img in synthesized_imgs:
-        # synthesized image dimension should be (C, H, W)
-        if synthesized_img.dim( ) > 3: synthesized_img.squeeze( )
+    # target image should be of dimension (C, H, W)
+    if target_img.dim( ) > 3: target_img = target_img.squeeze( )
+    target_imgs = torch.stack([target_img] * len(synthesized_imgs))
 
-        # take the per-pixel difference and get the mean difference
-        # per pixel across the dimension of the channels
-        costs.append(torch.squeeze(target_img - synthesized_img).mean(dim = 0))
-    costs = torch.stack(costs, dim = 0)
+    # get the mean of the differences along dimension C
+    costs = (target_imgs - synthesized_imgs).mean(dim = 1)
     return costs
 
 
-def construct_pose(pose_vector):
+def construct_pose(pose_vector, device):
     pose_vector = torch.squeeze(pose_vector)
-    rot = pose_vector[:3].to('cpu')
-    translation = pose_vector[3:].view(-1, 1).to('cpu')
+    rot_vec = pose_vector[:3]
+    trans_vec = pose_vector[3:].view(-1, 1)
 
-    theta = np.linalg.norm(rot); u = rot / theta
-    if theta < 1e-10:  rot_mat = np.eye(3)
+    theta = torch.linalg.norm(rot_vec); u = rot_vec / theta
+    if theta < 1e-10:  rot_mat = torch.eye(3)
     else:
-        U = np.array([[0, -u[2], u[1]],
-                      [u[2], 0, -u[0]],
-                      [-u[1], u[0], 0]])
-        rot_mat = np.eye(3) + np.sin(theta) * U + (1 - np.cos(theta)) * np.matmul(U, U)
-    pose_mat = torch.cat((torch.from_numpy(rot_mat), translation), dim = 1).float( )
+        U = torch.Tensor([[0, -u[2], u[1]],
+                          [u[2], 0, -u[0]],
+                          [-u[1], u[0], 0]]).to(device)
+        rot_mat = torch.eye(3).to(device) + torch.sin(theta) * U + (1 - torch.cos(theta)) * torch.matmul(U, U)
+    pose_mat = torch.cat((rot_mat, trans_vec), dim = 1)
     return pose_mat
     
 

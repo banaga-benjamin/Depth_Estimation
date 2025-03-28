@@ -18,39 +18,25 @@ from torch.utils.data import DataLoader
 
 def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_decoder: depth_decoder.DepthDecoder, convgru: depth_convgru.ConvGru,
                     p_encoder: pose_encoder.PoseEncoder, p_decoder: pose_decoder.PoseDecoder, device: str = "cpu"):
-    # set height, width, and scales to be used
+    # set height, width, and depths
+    # for cost volume calculation
     H = 192; W = 640
-    scales = [(128, H // 16, W // 16), (64, H // 8, W // 8), 
-              (32, H // 4, W // 4), (16, H // 2, W // 2)]
+    depths = 64; cost_height = H // 2; cost_width = W // 2
 
-    # calculate intrinsic matrices
-    intrinsic_mats = list( ); intrinsic_invs = list( )
-
-    k = np.array(
+    # calculate intrinsic matrix for cost volume
+    intrinsic_mat = torch.Tensor(
             [[0.58, 0.00, 0.50, 0.00],
             [0.00, 1.92, 0.50, 0.00],
             [0.00, 0.00, 1.00, 0.00],
-            [0.00, 0.00, 0.00, 1.00]],
-            dtype = np.float32
-        )
+            [0.00, 0.00, 0.00, 1.00]]
+        ).to(device)
 
-    for scale in scales:
-        k_copy = k.copy( )
-        _, height, width = scale
-
-        k_copy[0, :] *= width; k_copy[1, :] *= height
-        inv_k = np.linalg.pinv(k_copy)
-
-        intrinsic_mats.append(torch.from_numpy(k_copy))
-        intrinsic_invs.append(torch.from_numpy(inv_k))
-
-        if device == "cuda":
-            intrinsic_mats[-1] = intrinsic_mats[-1].cuda( )
-            intrinsic_invs[-1] = intrinsic_invs[-1].cuda( )
+    intrinsic_mat[0, :] *= cost_width; intrinsic_mat[1, :] *= cost_height
+    intrinsic_inv = torch.linalg.pinv(intrinsic_mat)
 
     start_time = time( )
     num_batches = len(dataloader.dataset) // dataloader.batch_size
-    print("number of batches:", num_batches, "\n")
+    print("Number of Batches:", num_batches, "\n")
     for batch, img_batch in enumerate(dataloader):
         for img_seq in img_batch:
             # img_seq dimension is (N, C, H, W)
@@ -60,17 +46,14 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
             for idx in range(len(img_seq) - 1):
                 p_encoder_outputs = p_encoder(torch.stack((img_seq[-1], img_seq[idx])))
                 p_decoder_output = p_decoder(p_encoder_outputs[0], p_encoder_outputs[1])
-                pose_mat = func_utils.construct_pose(p_decoder_output).to(device)
+                pose_mat = func_utils.construct_pose(p_decoder_output, device)
 
-                synthesized_imgs = func_utils.synthesize_at_scales(intrinsic_mats, intrinsic_invs, pose_mat, scales, img_seq[idx], device)
+                synthesized_imgs = func_utils.synthesize_from_depths(intrinsic_mat, intrinsic_inv, pose_mat, depths, cost_width, cost_height, img_seq[idx], device)
 
-                cost_volume = list( )
-                for scale in range(len(synthesized_imgs)):
-                    _, height, width = scales[scale]
-                    resize_img = transforms.Resize(size = (height, width))
-
-                    cost_volume.append(func_utils.cost_volume(resize_img(img_seq[-1]), synthesized_imgs[scale]))
+                resize_img = transforms.Resize(size = (cost_height, cost_width))
+                cost_volume = func_utils.cost_volume(resize_img(img_seq[-1]), synthesized_imgs)
                 depth_outputs = convgru(d_decoder(d_encoder_outputs, cost_volume))
+        print("batch no.", batch, "completed")
         torch.cuda.empty_cache( )
 
         if batch % 100 == 0:
@@ -108,6 +91,7 @@ if __name__ == "__main__":
     p_encoder = pose_encoder.PoseEncoder(device = device)
     p_decoder = pose_decoder.PoseDecoder(device = device)
 
-    EPOCHS = 1
+    EPOCHS = 1; print("Number of Epochs:", EPOCHS, "\n")
     for epoch in range(EPOCHS):
+        print("Current Epoch:", epoch)
         with torch.no_grad( ): train_step(train_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, device)
