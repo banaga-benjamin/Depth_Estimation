@@ -9,16 +9,17 @@ class PoseDecoder(nn.Module):
     def __init__(self, in_channels: int = 1024, device: str = 'cpu'):
         super( ).__init__( )
         
-        self.conv_elu = list( )
-        self.conv_elu.append(nn.Conv2d(in_channels, in_channels // 2, kernel_size = (1,1), stride = (1, 1)))
-        self.conv_elu.append(nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
-        self.conv_elu.append(nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
-    
-        self.conv = nn.Conv2d(in_channels // 2, 6, kernel_size = (1, 1), stride = (1, 1))
-    
         self.device = device
-        self.conv.to(self.device)
-        for conv_elu in self.conv_elu: conv_elu.to(self.device)
+        self.conv_elu = list( )
+        self.conv = nn.Conv2d(in_channels // 2, 6, kernel_size = (1, 1), stride = (1, 1)).to(device)
+        self.conv_elu.append(nn.Conv2d(in_channels, in_channels // 2, kernel_size = (1,1), stride = (1, 1)).to(device))
+        self.conv_elu.append(nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)).to(device))
+        self.conv_elu.append(nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)).to(device))
+
+        self.layers = list( )
+        self.layers.append(self.conv)
+        for conv_elu in self.conv_elu: self.layers.append(conv_elu)
+    
 
     def forward(self, target_feature, src_feature):
         # inputs should be of dimensions (C, H, W)

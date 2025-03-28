@@ -1,12 +1,25 @@
 import torch
 import numpy as np
+from torch import nn
 from torch.nn import functional
 from torchvision import transforms
 
 
-def reproject_from_depth(intrinsic_mat, intrinsic_inv, pose_mat, depth_map, width, height, device):
+def reproject_from_depth(pose_mat, depth_map, width = 640, height = 192, device = "cpu", intrinsic_mat = None, intrinsic_inv = None):
     # intrinsic matrices are specified as 4 x 4 matrices
     # suitable for homogenous coordinate transformations
+
+    # if no intrinsic matrices are supplied
+    if intrinsic_mat is None:
+        intrinsic_mat = torch.Tensor(
+            [[0.58, 0.00, 0.50, 0.00],
+            [0.00, 1.92, 0.50, 0.00],
+            [0.00, 0.00, 1.00, 0.00],
+            [0.00, 0.00, 0.00, 1.00]]
+        ).to(device)
+
+        intrinsic_mat[0, :] *= width; intrinsic_mat[1, :] *= height
+        intrinsic_inv = torch.linalg.pinv(intrinsic_mat)
 
     # create a matrix of 4d pixel coordinates
     x_coords = torch.arange(width, dtype = torch.float32, device = device)
@@ -22,6 +35,8 @@ def reproject_from_depth(intrinsic_mat, intrinsic_inv, pose_mat, depth_map, widt
     output_pixels = torch.matmul(output_pixels, intrinsic_inv.T)
 
     # convert depth map to a matrix that can be multiplied with output pixels
+    if depth_map.dim( ) > 3: depth_map = depth_map.squeeze( )
+    if depth_map.dim( ) > 2: depth_map = depth_map.squeeze( )
     depth_map = torch.stack([
         depth_map, depth_map, depth_map, torch.ones(height, width, device = device)
     ], dim = 2)
@@ -64,7 +79,7 @@ def synthesize_from_depths(intrinsic_mat, intrinsic_inv, pose_mat, depths, width
         depth_map = torch.ones(height, width, device = device) * depth
 
         # project some target image to the source image
-        proj_pixels = reproject_from_depth(intrinsic_mat, intrinsic_inv, pose_mat, depth_map, width, height, device)
+        proj_pixels = reproject_from_depth(pose_mat, depth_map, width, height, device, intrinsic_mat, intrinsic_inv)
 
         # synthesize the target image
         synthesized_img = synthesize(src_img, proj_pixels)
@@ -102,6 +117,29 @@ def construct_pose(pose_vector, device):
     pose_mat = torch.cat((rot_mat, trans_vec), dim = 1)
     return pose_mat
     
+
+def reprojection_loss(preds, targets):
+    if targets.dim( ) < 4: targets = targets.unsqueeze(dim = 0)
+    if preds.dim( ) < 4: preds = preds.unsqueeze(dim = 0)
+
+    x = functional.pad(preds, pad = (1, 1, 1, 1)); y = functional.pad(targets, pad = (1, 1, 1, 1))
+
+    mu_x = functional.avg_pool2d(x, kernel_size = 3, stride = 1)
+    mu_y = functional.avg_pool2d(y, kernel_size = 3, stride = 1)
+
+    sigma_x  = functional.avg_pool2d(x ** 2, kernel_size = 3, stride = 1) - mu_x ** 2
+    sigma_y  = functional.avg_pool2d(y ** 2, kernel_size = 3, stride = 1) - mu_y ** 2
+    sigma_xy = functional.avg_pool2d(x * y, kernel_size = 3, stride = 1) - mu_x * mu_y
+
+    SSIM_n = (2 * mu_x * mu_y + (0.01 ** 2)) * (2 * sigma_xy + (0.03 ** 2))
+    SSIM_d = (mu_x ** 2 + mu_y ** 2 + (0.01 ** 2)) * (sigma_x + sigma_y + (0.03 ** 2))
+
+    ssim_loss = torch.clamp((1 - SSIM_n / SSIM_d) / 2, 0, 1).mean(dim = 1, keepdim = True)
+    l1_loss = torch.abs(targets - preds).mean(dim = 1, keepdim = True)
+
+    # return 0.05 * ssim_loss + 0.15 * l1_loss
+    return (0.05 * ssim_loss + 0.15 * l1_loss).mean( )
+
 
 # for debugging
 # if __name__ == "__main__":

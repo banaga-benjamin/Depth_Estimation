@@ -12,17 +12,16 @@ class PoseEncoder(nn.Module):
         resnet_weights = models.ResNet18_Weights.DEFAULT
         reference_model = models.resnet18(weights = resnet_weights)
 
-        self.bn1 = reference_model.bn1
-        self.relu = reference_model.relu
-        self.conv1 = reference_model.conv1
-        self.maxpool = reference_model.maxpool
+        self.bn1 = reference_model.bn1.to(device)
+        self.relu = reference_model.relu.to(device)
+        self.conv1 = reference_model.conv1.to(device)
+        self.maxpool = reference_model.maxpool.to(device)
 
-        self.layer1 = reference_model.layer1
-        self.layer2 = reference_model.layer2
-        self.layer3 = reference_model.layer3
-        self.layer4 = reference_model.layer4
+        self.layer1 = reference_model.layer1.to(device)
+        self.layer2 = reference_model.layer2.to(device)
+        self.layer3 = reference_model.layer3.to(device)
+        self.layer4 = reference_model.layer4.to(device)
 
-        self.to(device)
         for parameter in self.parameters( ): parameter.requires_grad = False
 
 

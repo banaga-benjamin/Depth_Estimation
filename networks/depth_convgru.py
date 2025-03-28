@@ -8,19 +8,15 @@ class ConvGru(nn.Module):
     def __init__(self, input_size = 1, hidden_size = 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1), device = 'cpu'):
         super( ).__init__( )
 
-        self.inputsize = input_size
-        self.hidden_size = hidden_size
-        self.reset_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding)
-        self.update_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding)
-        self.output_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding)
-
+        self.reset_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding).to(device)
+        self.update_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding).to(device)
+        self.output_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding).to(device)
+        
         init.orthogonal_(self.reset_gate.weight); init.constant_(self.reset_gate.bias, 0.0)
         init.orthogonal_(self.update_gate.weight); init.constant_(self.update_gate.bias, 0.0)
         init.orthogonal_(self.output_gate.weight); init.constant_(self.output_gate.bias, 0.0)
 
-
         self.scale = 4
-        self.to(device)
         self.device = device
         self.prev_states = None
 
@@ -46,7 +42,11 @@ class ConvGru(nn.Module):
             output = self.prev_states[scale] * (1 - update) + candidate_new_state * update; del update
 
             outputs.append(output)
-        self.prev_states = outputs
+        
+        # save hidden state
+        self.prev_states = outputs.copy( )
+        for idx in range(len(self.prev_states)):
+            self.prev_states[idx] = self.prev_states[idx].detach( )
         return outputs
 
 
