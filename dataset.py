@@ -76,56 +76,70 @@ class TrainingData(Dataset):
 
 
 class TestingData(Dataset):
-    def __init__(self, seq_len: int, device, transform = None, image_path = "kitti_data") -> None:
+    def __init__(self, seq_len: int, device, transform = None, image_path = "kitti_data", depth_path = "data_depth_annotated") -> None:
         self.device = device
         self.transform = transform
     
         # set training data subdirectory
         image_path = Path(image_path)
+        depth_path = Path(depth_path)
 
         # testing data roots
         test_data_roots = ["2011_10_03"]
 
         # get subdirectories of testing data roots
-        test_data_subdirectories = { }
+        test_image_subdirectories = { }
+        test_depth_subdirectories = { }
         for test_data_root in test_data_roots:
             if not (image_path / test_data_root).is_dir( ): continue
+            if not (depth_path / test_data_root).is_dir( ): continue
+            
+            test_image_subdirectories[test_data_root] = list( )
+            test_depth_subdirectories[test_data_root] = list( )
+            for image_subdirectory, depth_subdirectory in zip((image_path / test_data_root).iterdir( ), (depth_path / test_data_root).iterdir( )):
+                if image_subdirectory.is_dir( ) and depth_subdirectory.is_dir( ):
+                    test_image_subdirectories[test_data_root].append(image_subdirectory)
+                    test_depth_subdirectories[test_data_root].append(depth_subdirectory)
 
-            test_data_subdirectories[test_data_root] = list( )
-            for subdirectory in (image_path / test_data_root).iterdir( ):
-                if subdirectory.is_dir( ): test_data_subdirectories[test_data_root].append(subdirectory)
-
-        # get file paths of testing data images
+        # get file paths of testing data images and depths
         test_left = { }
-        for subdirectories in test_data_subdirectories.values( ):
-            for subdirectory in subdirectories:
-                test_left[subdirectory] = list( )
-                for left_img in (subdirectory / "image_02/data").iterdir( ):
-                    if left_img.suffix != ".png": continue
-                    test_left[subdirectory].append(left_img)
+        test_depth = { }
+        for image_subdirectories, depth_subdirectories in zip(test_image_subdirectories.values( ), test_depth_subdirectories.values( )):
+            for image_subdirectory, depth_subdirectory in zip(image_subdirectories, depth_subdirectories):
+                test_left[image_subdirectory] = list( )
+                test_depth[depth_subdirectory] = list( )
+                for left_img, depth in zip((image_subdirectory / "image_02/data").iterdir( ), (depth_subdirectory / "proj_depth/groundtruth/image_02").iterdir( )):
+                    if left_img.suffix != ".png" or depth.suffix != ".png": continue
+                    test_left[image_subdirectory].append(left_img)
+                    test_depth[depth_subdirectory].append(depth)
 
-        # concatenate adjacent images to sequences of specified length
+        # concatenate adjacent images to sequences of specified length and match with corresponding depths
         seq_test_left = [ ]
-        for subdirectories in test_data_subdirectories.values( ):
-            for subdirectory in subdirectories:
-                for idx in range(len(test_left[subdirectory]) - seq_len + 1):
-                    seq_test_left.append(test_left[subdirectory][idx:idx + seq_len])
+        seq_test_depth = [ ]
+        for img_subdirectories, depth_subdirectories in zip(test_image_subdirectories.values( ), test_depth_subdirectories.values( )):
+            for img_subdirectory, depth_subdirectory in zip(img_subdirectories, depth_subdirectories):
+                for idx in range(len(test_left[img_subdirectory]) - seq_len + 1):
+                    seq_test_left.append(test_left[img_subdirectory][idx:idx + seq_len])
+                    seq_test_depth.append(test_depth[depth_subdirectory][idx + seq_len - 1])
+        
+        self.seq_len = seq_len
         self.test_left = seq_test_left
+        self.test_depth = seq_test_depth
 
         # printing testing data statistics
         print("\nTest Data Directories...\n")
-        for subdirectories in test_data_subdirectories.values( ):
+        for img_subdirectories, depth_subdirectories in zip(test_image_subdirectories.values( ), test_depth_subdirectories.values( )):
             count = 0
-            for subdirectory in subdirectories:
+            for img_subdirectory, depth_subdirectory in zip(img_subdirectories, depth_subdirectories):
                 count += 1
 
-                if count <= 8: print(subdirectory)
+                if count <= 8: print(img_subdirectory, "\t", depth_subdirectory)
                 elif count == 8:
-                    print(str(subdirectory) + "..."); break
+                    print(str(img_subdirectory, depth_subdirectory) + "..."); break
             print("\n")
 
     def __getitem__(self, index: int) -> torch.Tensor:
-        # returns a sequence of images indexed by index
+        # collect sequence of images indexed by index
         img_seq = list( )
         to_tensor = transforms.Compose([transforms.ToTensor( )])
         for img_path in self.test_left[index]:
@@ -135,7 +149,14 @@ class TestingData(Dataset):
             img_seq.append(img)
         img_seq = torch.stack(img_seq)
         img_seq = img_seq.to(self.device)
-        return img_seq
+
+        # pair with corresponding depth
+        depth = Image.open(self.test_depth[index])
+        if self.transform: depth = self.transform(depth)
+        if not torch.is_tensor(depth): depth = to_tensor(depth)
+        depth = depth.to(self.device)
+
+        return (img_seq, depth)
 
 
     def __len__(self) -> int:
