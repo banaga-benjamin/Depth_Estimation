@@ -133,7 +133,7 @@ if __name__ == "__main__":
         {'params': p_decoder.parameters( ), 'lr': 1e-3}
     ])
 
-    folder = Path("trained models")
+    folder = Path("trained_models")
     folder.mkdir(exist_ok = True)  # create folder if needed
 
     EPOCHS = 1

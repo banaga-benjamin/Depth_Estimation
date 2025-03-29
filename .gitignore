@@ -1,4 +1,5 @@
+temp.py
 __pycache__/
 kitti_data/
+trained_models/
 data_depth_annotated/
-temp.py
