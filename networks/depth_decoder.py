@@ -96,6 +96,7 @@ class DepthDecoder(nn.Module):
             outputs.append(output)
         return outputs
 
+
 # for debugging
 # if __name__ == "__main__":
 #    device = 'cuda' if torch.cuda.is_available( ) else 'cpu'

@@ -39,7 +39,7 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
         # initialize loss
         overall_loss = 0
 
-        for seq, img_seq in enumerate(img_batch):
+        for img_seq in img_batch:
             # target image has dimensions (C, H, W)
             # image sequence has dimensions (N, C, H, W)
             target_img = img_seq[-1]; src_imgs = img_seq[:-1]

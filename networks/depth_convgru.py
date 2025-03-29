@@ -19,6 +19,7 @@ class ConvGru(nn.Module):
         self.scale = 4
         self.prev_states = None
 
+
     def forward(self, input):        
         # initialize previous states if there are none
         if self.prev_states is None:
