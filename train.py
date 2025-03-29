@@ -92,7 +92,7 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
 
         torch.cuda.empty_cache( )
 
-        if batch % 10 == 0:
+        if batch % 100 == 0:
             if batch == 0: continue
             elapsed_time = (time( ) - start_time)
 
@@ -107,7 +107,7 @@ if __name__ == "__main__":
 
     device = 'cuda' if torch.cuda.is_available( ) else 'cpu'
     print("using device:", device)
-    print("\nnote: trained models will be saved at 'trained models' folder")
+    print("\nnote: trained models will be saved at 'trained_models' folder")
 
     train_transform = transforms.Compose([
         transforms.TrivialAugmentWide(num_magnitude_bins = 7),

@@ -31,8 +31,8 @@ class TrainingData(Dataset):
 
         # get file paths of training data images
         train_left = { }
-        for train_data_root in train_data_roots:
-            for subdirectory in train_data_subdirectories[train_data_root]:
+        for subdirectories in train_data_subdirectories.values( ):
+            for subdirectory in subdirectories:
                 train_left[subdirectory] = list( )
                 for left_img in (subdirectory / "image_02/data").iterdir( ):
                     if left_img.suffix != ".png": continue
@@ -40,19 +40,23 @@ class TrainingData(Dataset):
 
         # concatenate adjacent images to sequences of specified length
         seq_train_left = [ ]
-        for train_data_root in train_data_roots:
-            for subdirectory in train_data_subdirectories[train_data_root]:
+        for subdirectories in train_data_subdirectories.values( ):
+            for subdirectory in subdirectories:
                 for idx in range(len(train_left[subdirectory]) - seq_len + 1):
                     seq_train_left.append(train_left[subdirectory][idx:idx + seq_len])
         self.train_left = seq_train_left
 
         # printing training data statistics
         print("\nTraining Data Directories...\n")
-        for train_data_root in train_data_roots:
-            print("Training Data Root:", train_data_root)
-            for subdirectory in train_data_subdirectories[train_data_root]: print(subdirectory)
-            print("-" * 100, "\n")
+        for subdirectories in train_data_subdirectories.values( ):
+            count = 0
+            for subdirectory in subdirectories:
+                count += 1
 
+                if count < 8: print(subdirectory)
+                elif count == 8:
+                    print(str(subdirectory) + "..."); break
+            print("\n")
 
     def __len__(self) -> int:
         return len(self.train_left)
@@ -85,18 +89,18 @@ class TestingData(Dataset):
         test_data_roots = ["2011_10_03"]
 
         # get subdirectories of testing data roots
-        test_data_subdirectory = { }
+        test_data_subdirectories = { }
         for test_data_root in test_data_roots:
             if not (image_path / test_data_root).is_dir( ): continue
 
-            test_data_subdirectory[test_data_root] = list( )
+            test_data_subdirectories[test_data_root] = list( )
             for subdirectory in (image_path / test_data_root).iterdir( ):
-                if subdirectory.is_dir( ): test_data_subdirectory[test_data_root].append(subdirectory)
+                if subdirectory.is_dir( ): test_data_subdirectories[test_data_root].append(subdirectory)
 
         # get file paths of testing data images
         test_left = { }
-        for test_data_root in test_data_roots:
-            for subdirectory in test_data_subdirectory[test_data_root]:
+        for subdirectories in test_data_subdirectories.values( ):
+            for subdirectory in subdirectories:
                 test_left[subdirectory] = list( )
                 for left_img in (subdirectory / "image_02/data").iterdir( ):
                     if left_img.suffix != ".png": continue
@@ -104,18 +108,23 @@ class TestingData(Dataset):
 
         # concatenate adjacent images to sequences of specified length
         seq_test_left = [ ]
-        for test_data_root in test_data_roots:
-            for subdirectory in test_data_subdirectory[test_data_root]:
+        for subdirectories in test_data_subdirectories.values( ):
+            for subdirectory in subdirectories:
                 for idx in range(len(test_left[subdirectory]) - seq_len + 1):
                     seq_test_left.append(test_left[subdirectory][idx:idx + seq_len])
         self.test_left = seq_test_left
 
         # printing testing data statistics
-        print("\nTesting Data Directories...\n")
-        for test_data_root in test_data_roots:
-            print("Testing Data Root:", test_data_root)
-            for subdirectory in test_data_subdirectory[test_data_root]: print(subdirectory)
-            print("-" * 100, "\n")
+        print("\nTest Data Directories...\n")
+        for subdirectories in test_data_subdirectories.values( ):
+            count = 0
+            for subdirectory in subdirectories:
+                count += 1
+
+                if count <= 8: print(subdirectory)
+                elif count == 8:
+                    print(str(subdirectory) + "..."); break
+            print("\n")
 
     def __getitem__(self, index: int) -> Tensor:
         # returns a sequence of images indexed by index
