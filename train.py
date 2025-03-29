@@ -1,8 +1,10 @@
 from time import time
 from os import cpu_count
 
+import metrics
 import dataset
-import func_utils
+import synthesis
+
 from networks import depth_encoder
 from networks import depth_decoder
 from networks import depth_convgru
@@ -53,28 +55,28 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
             # obtain pose matrix relative to source images
             p_encoder_outputs = p_encoder(img_seq)
             p_decoder_outputs = p_decoder(p_encoder_outputs[-1], p_encoder_outputs[:-1])
-            pose_mats = torch.stack([func_utils.construct_pose(p_decoder_output, device) for p_decoder_output in p_decoder_outputs], dim = 0)
+            pose_mats = torch.stack([synthesis.construct_pose(p_decoder_output, device) for p_decoder_output in p_decoder_outputs], dim = 0)
 
             # synthesize images for computing cost volumes
             synthesized_imgs = [
-                func_utils.synthesize_from_depths(intrinsic_mat, intrinsic_inv, pose_mats[idx], cost_depths,
+                synthesis.synthesize_from_depths(intrinsic_mat, intrinsic_inv, pose_mats[idx], cost_depths,
                                                   cost_width, cost_height, img_seq[idx], device).detach( )
                 for idx in range(len(img_seq) - 1)]
 
             # compute the cost volumes relative to source images
             resized_target_img = functional.interpolate(img_seq[-1].unsqueeze(dim = 0), size = (cost_height, cost_width), mode = "bilinear")
-            cost_volumes = func_utils.cost_volumes(resized_target_img, torch.stack(synthesized_imgs))
+            cost_volumes = metrics.cost_volumes(resized_target_img, torch.stack(synthesized_imgs))
 
             # obtain depth outputs from depth decoder -> convgru
             depth_outputs = convgru(d_decoder(d_encoder_outputs, cost_volumes))
                 
             # synthesize the source images from the target image and final depth predictions
             proj_pixels = torch.stack([
-                func_utils.reproject_from_depth(pose_mats[idx], depth_outputs[idx], device = device)
+                synthesis.reproject_from_depth(pose_mats[idx], depth_outputs[idx], device = device)
                 for idx in range(len(img_seq) - 1)
                 ], dim = 0)
 
-            output_imgs = func_utils.synthesize(src_imgs, proj_pixels)
+            output_imgs = synthesis.synthesize(src_imgs, proj_pixels)
 
             # update lists used in computation of loss
             target_imgs_list.append(torch.stack([target_img] * (len(img_seq) - 1), dim = 0))
@@ -82,8 +84,8 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
             depth_outputs_list.append(depth_outputs)
 
         # calculate overall loss
-        overall_loss = func_utils.regularization_term(torch.cat(depth_outputs_list, dim = 0), torch.cat(target_imgs_list, dim = 0))
-        overall_loss += func_utils.reprojection_loss(torch.cat(output_imgs_list, dim = 0), torch.cat(target_imgs_list, dim = 0))
+        overall_loss = metrics.regularization_term(torch.cat(depth_outputs_list, dim = 0), torch.cat(target_imgs_list, dim = 0))
+        overall_loss += metrics.reprojection_loss(torch.cat(output_imgs_list, dim = 0), torch.cat(target_imgs_list, dim = 0))
 
         # perform backpropagation
         optimizer.zero_grad( )

@@ -1,6 +1,5 @@
-import torch
 from torch import nn
-from torchinfo import summary
+from torch import unsqueeze
 from torchvision import models
 
 
@@ -27,7 +26,7 @@ class PoseEncoder(nn.Module):
 
     def forward(self, input):
         # input dimension should be (N, C, H, W)
-        if input.dim( ) < 4: input = torch.unsqueeze(input, dim = 0)
+        if input.dim( ) < 4: input = unsqueeze(input, dim = 0)
 
         # preprocess input before passing to residual layers
         output = self.maxpool(self.relu(self.bn1(self.conv1(input))))
@@ -36,18 +35,3 @@ class PoseEncoder(nn.Module):
         output = self.layer3(output)
         output = self.layer4(output)
         return output
-
-
-# for debugging
-# if __name__ == "__main__":
-#     device = 'cuda' if torch.cuda.is_available( ) else 'cpu'
-#     model = PoseEncoder( ); print(model)
-
-#     H = 192; W = 640
-#     summary(model = model, 
-#             input_size = (1, 3, H, W),
-#             col_names=["input_size", "output_size", "trainable"],
-#             # col_names=["input_size", "output_size", "num_params", "trainable"],
-#             col_width=20,
-#             row_settings=["var_names"]
-#     )

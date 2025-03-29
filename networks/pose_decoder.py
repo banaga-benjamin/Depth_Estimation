@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 from torch.nn import init
-from torchinfo import summary
 from torch.nn import functional
 
 
@@ -16,6 +15,9 @@ class PoseDecoder(nn.Module):
         self.conv_elu.append(nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
         self.conv_elu.append(nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
     
+        init.orthogonal_(self.conv.weight); init.constant_(self.conv.bias, 0.0)
+        for conv_elu in self.conv_elu:
+            init.orthogonal_(conv_elu.weight); init.constant_(conv_elu.bias, 0.0)
 
     def forward(self, target_feature, src_features):
         # target feature should have dimensions (1, C, H, W)
@@ -38,15 +40,3 @@ class PoseDecoder(nn.Module):
             for channel in range(conv_output.size(dim = 1)):
                 output[batch][channel] = torch.mean(conv_output[batch][channel])
         return output
-
-
-# for debugging
-# if __name__ == "__main__":
-#    device = 'cuda' if torch.cuda.is_available( ) else 'cpu'
-
-#    H = 192; W = 640
-#    input = torch.rand(1, 1024, H // 32, W // 32, device = device)
-   
-   
-#    model = PoseDecoder(device = device, in_channels = 1024); outputs = model(input)
-#    for output in outputs: print(output)

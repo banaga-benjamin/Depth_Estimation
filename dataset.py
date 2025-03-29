@@ -1,6 +1,4 @@
-from torch import stack
-from torch import Tensor
-from torch import is_tensor
+import torch
 from torchvision import transforms
 from torch.utils.data import Dataset
 
@@ -62,17 +60,17 @@ class TrainingData(Dataset):
         return len(self.train_left)
 
 
-    def __getitem__(self, index: int) -> Tensor:
+    def __getitem__(self, index: int) -> torch.Tensor:
         # returns a sequence of images indexed by index
         img_seq = list( )
         to_tensor = transforms.Compose([transforms.ToTensor( )])
         for img_path in self.train_left[index]:
             img = Image.open(img_path)
             if self.transform: img = self.transform(img)
-            if not is_tensor(img): img = to_tensor(img)
+            if not torch.is_tensor(img): img = to_tensor(img)
             img_seq.append(img)
         
-        img_seq = stack(img_seq)
+        img_seq = torch.stack(img_seq)
         img_seq = img_seq.to(self.device)    
         return img_seq
 
@@ -126,16 +124,16 @@ class TestingData(Dataset):
                     print(str(subdirectory) + "..."); break
             print("\n")
 
-    def __getitem__(self, index: int) -> Tensor:
+    def __getitem__(self, index: int) -> torch.Tensor:
         # returns a sequence of images indexed by index
         img_seq = list( )
         to_tensor = transforms.Compose([transforms.ToTensor( )])
         for img_path in self.test_left[index]:
             img = Image.open(img_path)
             if self.transform: img = self.transform(img)
-            if not is_tensor(img): img = to_tensor(img)
+            if not torch.is_tensor(img): img = to_tensor(img)
             img_seq.append(img)
-        img_seq = stack(img_seq)
+        img_seq = torch.stack(img_seq)
         img_seq = img_seq.to(self.device)
         return img_seq
 

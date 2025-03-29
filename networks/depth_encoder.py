@@ -1,6 +1,5 @@
-import torch
 from torch import nn
-from torchinfo import summary
+from torch import unsqueeze
 from torchvision import models
 
 
@@ -27,7 +26,7 @@ class DepthEncoder(nn.Module):
 
     def forward(self, input):
         # input should be of dimension (N, C, H, W)
-        if input.dim( ) < 4: input = torch.unsqueeze(input, dim = 0)
+        if input.dim( ) < 4: input = unsqueeze(input, dim = 0)
         
         outputs = list( )
         # preprocess input before passing to residual layers
@@ -40,18 +39,3 @@ class DepthEncoder(nn.Module):
         outputs.append(self.layer4(outputs[-1]))
         outputs.reverse( )
         return outputs
-
-
-# for debugging
-# if __name__ == "__main__":
-#    device = 'cuda' if torch.cuda.is_available( ) else 'cpu'
-#    model = DepthEncoder( ); print(model)
-#
-#    H = 192; W = 640
-#    summary(model = model, 
-#            input_size = (1, 3, H, W),
-#            col_names=["input_size", "output_size", "trainable"],
-#            # col_names=["input_size", "output_size", "num_params", "trainable"],
-#            col_width=20,
-#            row_settings=["var_names"]
-#    )

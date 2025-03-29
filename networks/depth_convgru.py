@@ -55,18 +55,3 @@ class ConvGru(nn.Module):
             outputs[idx + 1] += outputs[idx]
             H *= 2; W *= 2
         return outputs[-1] / len(outputs)
-
-
-# for debugging
-# if __name__ == "__main__":
-#    device = 'cuda' if torch.cuda.is_available( ) else 'cpu'
-  
-#    H = 192; W = 640
-#    input = [torch.rand(1, 1, H // 8, W // 8, device = device),
-#             torch.rand(1, 1, H // 4, W // 4, device = device),
-#             torch.rand(1, 1, H // 2, W // 2, device = device),
-#             torch.rand(1, 1, H, W, device = device)]
-   
-
-#    model = ConvGru(device = device); output = model(input)
-#    print(output.shape)

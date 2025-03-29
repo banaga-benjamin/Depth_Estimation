@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 from torch.nn import init
-from torchinfo import summary
 from torch.nn import functional
 
 
@@ -95,17 +94,3 @@ class DepthDecoder(nn.Module):
 
             outputs.append(output)
         return outputs
-
-
-# for debugging
-# if __name__ == "__main__":
-#    device = 'cuda' if torch.cuda.is_available( ) else 'cpu'
-
-#    H = 192; W = 640
-#    input = [torch.rand(1, 512, H // 32, W // 32, device = device), torch.rand(1, 256, H // 16, W // 16, device = device),
-#             torch.rand(1, 128, H // 8, W // 8, device = device), torch.rand(1, 64, H // 4, W // 4, device = device)]
-   
-#    cost = torch.rand(1, 64, H // 2, W // 2, device = device)
-   
-#    model = DepthDecoder(device = device); outputs = model(input, cost)
-#    for output in outputs: print(output.shape)
