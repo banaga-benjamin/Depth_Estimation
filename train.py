@@ -11,6 +11,7 @@ from networks import pose_encoder
 from networks import pose_decoder
 
 import torch
+from pathlib import Path
 from torch.nn import functional
 from torchvision import transforms
 from torch.utils.data import DataLoader
@@ -106,6 +107,7 @@ if __name__ == "__main__":
 
     device = 'cuda' if torch.cuda.is_available( ) else 'cpu'
     print("using device:", device)
+    print("\nnote: trained models will be saved at 'trained models' folder")
 
     train_transform = transforms.Compose([
         transforms.TrivialAugmentWide(num_magnitude_bins = 7),
@@ -113,7 +115,7 @@ if __name__ == "__main__":
         transforms.ToTensor( )
     ])
 
-    BATCH_SIZE = 8; NUM_WORKERS = cpu_count( )
+    BATCH_SIZE = 6; NUM_WORKERS = cpu_count( )
     train_data = dataset.TrainingData(seq_len = 4, device = device, transform = train_transform)
     train_dataloader = DataLoader(train_data, batch_size = BATCH_SIZE, num_workers = NUM_WORKERS // 2,
                                   shuffle = True, drop_last = True)
@@ -131,8 +133,17 @@ if __name__ == "__main__":
         {'params': p_decoder.parameters( ), 'lr': 1e-3}
     ])
 
-    EPOCHS = 1; print("Number of Epochs:", EPOCHS, "\n")
+    folder = Path("trained models")
+    folder.mkdir(exist_ok = True)  # create folder if needed
+
+    EPOCHS = 1
     for epoch in range(EPOCHS):
-        print("Current Epoch:", epoch + 1)
+        print( ); print("-" * 50)
+        print("Current Epoch:", epoch + 1, " / ", EPOCHS)
         d_decoder.train( ); p_decoder.train( ); convgru.train( )
         train_step(train_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, optimizer, device)
+
+        # save model weights
+        torch.save(convgru.state_dict( ), folder / f"convgru_weights_{epoch}.pth")
+        torch.save(d_decoder.state_dict( ), folder / f"depth_decoder_weights_{epoch}.pth")
+        torch.save(p_decoder.state_dict( ), folder / f"pose_decoder_weights_{epoch}.pth")
