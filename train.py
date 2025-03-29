@@ -112,12 +112,12 @@ if __name__ == "__main__":
     print("\nnote: trained models will be saved at 'trained_models' folder")
 
     train_transform = transforms.Compose([
-        transforms.TrivialAugmentWide(num_magnitude_bins = 7),
+        transforms.TrivialAugmentWide(num_magnitude_bins = 15),
         transforms.Resize((192, 640)),
         transforms.ToTensor( )
     ])
 
-    BATCH_SIZE = 6; NUM_WORKERS = cpu_count( )
+    BATCH_SIZE = 4; NUM_WORKERS = cpu_count( )
     train_data = dataset.TrainingData(seq_len = 4, device = device, transform = train_transform)
     train_dataloader = DataLoader(train_data, batch_size = BATCH_SIZE, num_workers = NUM_WORKERS // 2,
                                   shuffle = True, drop_last = True)

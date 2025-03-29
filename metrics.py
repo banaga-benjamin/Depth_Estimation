@@ -52,16 +52,20 @@ def regularization_term(depths, target_imgs):
 
 
 def rmse(pred_depths, depths):
+    # returns root of the mean squared error
     return torch.sqrt(functional.mse_loss(pred_depths, depths))
 
 
 def rmsle(pred_depths, depths, eps = 1e-6):
+    # returns root of the mean squared error of log values
     return rmse(torch.log(pred_depths + eps), torch.log(depths + eps))
 
 
 def abs_rel(pred_depths, depths, eps = 1e-6):
+    # returns the mean of the absolute relative error
     return torch.mean(torch.abs(pred_depths - depths) / (depths + eps))
 
 
 def sq_rel(pred_depths, depths, eps = 1e-6):
+    # returns the mean of the squared relative error
     return torch.mean(((pred_depths - depths) ** 2) / (depths + eps))
