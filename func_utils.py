@@ -89,16 +89,23 @@ def synthesize_from_depths(intrinsic_mat, intrinsic_inv, pose_mat, depths, width
     return torch.stack(synthesized_imgs)
 
 
-def cost_volume(target_img, synthesized_imgs):
-    costs = list( )
+# def cost_volume(target_img, synthesized_imgs):
+#     # target image should be of dimension (C, H, W)
+#     if target_img.dim( ) > 3: target_img = target_img.squeeze( )
+#     target_imgs = torch.stack([target_img] * len(synthesized_imgs))
 
+#     # get the mean of the differences along dimension C
+#     return (target_imgs - synthesized_imgs).mean(dim = 1)
+
+
+def cost_volumes(target_img, synthesized_imgs):
     # target image should be of dimension (C, H, W)
     if target_img.dim( ) > 3: target_img = target_img.squeeze( )
-    target_imgs = torch.stack([target_img] * len(synthesized_imgs))
+    target_imgs = torch.stack([target_img] * len(synthesized_imgs[0]))
+    target_imgs = torch.stack([target_imgs] * len(synthesized_imgs))
 
     # get the mean of the differences along dimension C
-    costs = (target_imgs - synthesized_imgs).mean(dim = 1)
-    return costs
+    return (target_imgs - synthesized_imgs).mean(dim = 2)
 
 
 def construct_pose(pose_vector, device):

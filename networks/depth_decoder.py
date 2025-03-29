@@ -47,24 +47,25 @@ class DepthDecoder(nn.Module):
         self.cost_layers = nn.ModuleList(reversed(self.cost_layers))
 
         
-    def forward(self, input, cost_volume):
+    def forward(self, input, cost_volumes):
         # input cost should be of dimension (N, C, H, W)
-        if cost_volume.dim( ) < 4: cost_volume = torch.unsqueeze(cost_volume, dim = 0)
-
-        # determine cost volumes from cost volume
-        output = cost_volume
+        if cost_volumes.dim( ) < 4: cost_volumes = torch.unsqueeze(cost_volumes, dim = 0)
+        
+        # pass cost volumes through cost layers
+        output = cost_volumes.clone( )
         cost_volumes = list( )
         for scale in range(self.scales):
             output = self.cost_layers[scale](output)
             cost_volumes.append(output)
         cost_volumes.reverse( ); del output
+
             
         outputs = list( )
         prev_scale_feature = None
         for scale in range(self.scales):
             # inputs should be of dimension (N, C, H, W)
-            if input[scale].dim( ) < 4: input[scale] = torch.unsqueeze(input[scale], dim = 0)
-            if cost_volumes[scale].dim( ) < 4: cost_volumes[scale] = torch.unsqueeze(cost_volumes[scale], dim = 0)
+            if input[scale].dim( ) < 4: input[scale] = torch.stack([input[scale]] * len(cost_volumes[scale]), dim = 0)
+            elif len(input[scale]) < len(cost_volumes[scale]): input[scale] = torch.cat([input[scale]] * len(cost_volumes[scale]), dim = 0)
 
             if scale != 0:
                 # concatenate input at current scale with previous scale feature

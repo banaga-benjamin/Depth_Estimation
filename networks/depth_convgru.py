@@ -49,12 +49,11 @@ class ConvGru(nn.Module):
         
         # aggregate depth outputs by resizingg and taking the average of the sum of depths
         H = 192 // (2 ** (len(outputs) - 2)); W = 640 // (2 ** (len(outputs) - 2))
-        final_output = None
         for idx in range(len(outputs) - 1):
             outputs[idx] = functional.interpolate(outputs[idx], size = (H, W), mode = "bilinear")
             outputs[idx + 1] += outputs[idx]
             H *= 2; W *= 2
-        return outputs[-1].mean(dim = 0)
+        return outputs[-1] / len(outputs)
 
 
 # for debugging
