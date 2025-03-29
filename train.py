@@ -66,11 +66,6 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
 
                 # obtain depth output from depth decoder -> convgru
                 depth_output = convgru(d_decoder(d_encoder_outputs, cost_volume))
-
-                # aggregate depth outputs by resizingg to (192, 640) and taking the average of the sum of depths
-                for idx in range(len(depth_output)): 
-                    depth_output[idx] = functional.interpolate(depth_output[idx], size = (192, 640), mode = "bilinear")
-                depth_output = torch.cat(depth_output, dim = 0).mean(dim = 0)
                 depth_outputs.append(depth_output)
                 
                 # synthesize the source image from target image and final depth prediction
@@ -127,11 +122,9 @@ if __name__ == "__main__":
     convgru = depth_convgru.ConvGru(device = device)
     d_encoder = depth_encoder.DepthEncoder(device = device)
     d_decoder = depth_decoder.DepthDecoder(device = device)
-    torch.compile(convgru); torch.compile(d_encoder); torch.compile(d_decoder)
 
     p_encoder = pose_encoder.PoseEncoder(device = device)
     p_decoder = pose_decoder.PoseDecoder(device = device)
-    torch.compile(p_encoder); torch.compile(p_decoder)
     
     convgru_parameters = list( )
     for name, param in convgru.named_parameters( ):

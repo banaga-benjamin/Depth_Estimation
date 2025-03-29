@@ -47,7 +47,15 @@ class ConvGru(nn.Module):
         self.prev_states = outputs.copy( )
         for idx in range(len(self.prev_states)):
             self.prev_states[idx] = self.prev_states[idx].detach( )
-        return outputs
+        
+        # aggregate depth outputs by resizingg and taking the average of the sum of depths
+        H = 192 // (2 ** (len(outputs) - 2)); W = 640 // (2 ** (len(outputs) - 2))
+        final_output = None
+        for idx in range(len(outputs) - 1):
+            outputs[idx] = functional.interpolate(outputs[idx], size = (H, W), mode = "bilinear")
+            outputs[idx + 1] += outputs[idx]
+            H *= 2; W *= 2
+        return outputs[-1].mean(dim = 0)
 
 
 # for debugging
@@ -61,5 +69,5 @@ class ConvGru(nn.Module):
 #             torch.rand(1, 1, H, W, device = device)]
    
 
-#    model = ConvGru(device = device); outputs = model(input)
-#    for output in outputs: print(output.shape)
+#    model = ConvGru(device = device); output = model(input)
+#    print(output.shape)
