@@ -20,9 +20,9 @@ from torch.utils.data import DataLoader
 
 
 def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_decoder: depth_decoder.DepthDecoder, convgru: depth_convgru.ConvGru,
-                    p_encoder: pose_encoder.PoseEncoder, p_decoder: pose_decoder.PoseDecoder, optimizer, device: str = "cpu", sid = False):
+                    p_encoder: pose_encoder.PoseEncoder, p_decoder: pose_decoder.PoseDecoder, optimizer, device: str = "cpu"):
     # determine which depths should be used in cost volume
-    if sid: DEPTHS = constants.SID_DEPTHS
+    if constants.USE_SID: DEPTHS = constants.SID_DEPTHS
     else: DEPTHS = constants.UID_DEPTHS
 
     start_time = time( )
@@ -131,7 +131,7 @@ if __name__ == "__main__":
         print( ); print("-" * 50)
         print("Current Epoch:", epoch + 1, " / ", constants.EPOCHS)
         d_decoder.train( ); p_decoder.train( ); convgru.train( )
-        train_step(train_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, optimizer, device, sid = True)
+        train_step(train_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, optimizer, device)
 
         # save model weights
         torch.save(convgru.state_dict( ), folder / f"convgru_weights_{epoch}.pth")

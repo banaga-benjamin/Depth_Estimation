@@ -1,13 +1,14 @@
 import torch
 import numpy as np
-
 from os import cpu_count
+
 
 # constants for image dimensions
 HEIGHT = 192; WIDTH = 640
 COST_HEIGHT = 96; COST_WIDTH = 320
 
 # constants for cost volume depths
+USE_SID = False
 COST_DEPTHS = 64
 UID_DEPTHS = np.arange(0.0, 1.0, 1 / COST_DEPTHS)
 SID_DEPTHS = np.array([np.exp(x * np.log(2) / COST_DEPTHS) - 1 for x in range(COST_DEPTHS)])
