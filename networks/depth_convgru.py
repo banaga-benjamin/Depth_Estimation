@@ -5,19 +5,18 @@ from torch.nn import functional
 
 
 class ConvGru(nn.Module):
-    def __init__(self, input_size = 1, hidden_size = 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1), device = 'cpu'):
+    def __init__(self, input_size = 1, hidden_size = 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)):
         super( ).__init__( )
 
-        self.reset_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding).to(device)
-        self.update_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding).to(device)
-        self.output_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding).to(device)
+        self.reset_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding)
+        self.update_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding)
+        self.output_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding)
         
         init.orthogonal_(self.reset_gate.weight); init.constant_(self.reset_gate.bias, 0.0)
         init.orthogonal_(self.update_gate.weight); init.constant_(self.update_gate.bias, 0.0)
         init.orthogonal_(self.output_gate.weight); init.constant_(self.output_gate.bias, 0.0)
 
         self.scale = 4
-        self.device = device
         self.prev_states = None
 
     def forward(self, input):        
@@ -25,7 +24,7 @@ class ConvGru(nn.Module):
         if self.prev_states is None:
             self.prev_states = list( )
             for scale in range(self.scale):
-                self.prev_states.append(torch.zeros_like(input[scale], device = self.device))
+                self.prev_states.append(torch.zeros_like(input[scale]))
 
         outputs = list( )
         for scale in range(self.scale):

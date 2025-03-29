@@ -6,54 +6,46 @@ from torch.nn import functional
 
 
 class DepthDecoder(nn.Module):
-    def __init__(self, in_channels: int = 512, device: str = 'cpu'):
+    def __init__(self, in_channels: int = 512):
         super( ).__init__( )
-        self.cost_layers = list( )
+        self.cost_layers = nn.ModuleList( )
 
-        self.upscale_layers = list( )
-        self.upscale_layers.append(list( ))
-        self.upscale_layers.append(list( ))
+        self.upscale_layers = nn.ModuleList( )
+        self.upscale_layers.append(nn.ModuleList( ))
+        self.upscale_layers.append(nn.ModuleList( ))
 
-        self.map_layers = list( )
-        self.compress_layers = list( )
-        self.compress_layers.append(list( ))
-        self.compress_layers.append(list( ))
+        self.map_layers = nn.ModuleList( )
+        self.compress_layers = nn.ModuleList( )
+        self.compress_layers.append(nn.ModuleList( ))
+        self.compress_layers.append(nn.ModuleList( ))
 
         self.scales = 4
         channels = in_channels
         for scale in range(self.scales):
             if scale != 3:
-                self.cost_layers.append(nn.Conv2d(channels // 4, channels // 2, kernel_size = (2, 2), stride = (2, 2)).to(device))
+                self.cost_layers.append(nn.Conv2d(channels // 4, channels // 2, kernel_size = (2, 2), stride = (2, 2)))
                 init.orthogonal_(self.cost_layers[-1].weight); init.constant_(self.cost_layers[-1].bias, 0.0)
 
-            self.upscale_layers[0].append(nn.ConvTranspose2d(channels, channels // 2, kernel_size = (2, 2), stride = (2, 2)).to(device))
-            self.upscale_layers[1].append(nn.ConvTranspose2d(channels // 2, channels // 4, kernel_size = (2, 2), stride = (2, 2)).to(device))
+            self.upscale_layers[0].append(nn.ConvTranspose2d(channels, channels // 2, kernel_size = (2, 2), stride = (2, 2)))
+            self.upscale_layers[1].append(nn.ConvTranspose2d(channels // 2, channels // 4, kernel_size = (2, 2), stride = (2, 2)))
 
             init.orthogonal_(self.upscale_layers[0][-1].weight); init.constant_(self.upscale_layers[0][-1].bias, 0.0)
             init.orthogonal_(self.upscale_layers[1][-1].weight); init.constant_(self.upscale_layers[1][-1].bias, 0.0)
 
             if scale != 0:
-                self.compress_layers[0].append((nn.Conv2d(channels * 2, channels, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1))).to(device))
+                self.compress_layers[0].append((nn.Conv2d(channels * 2, channels, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1))))
                 init.orthogonal_(self.compress_layers[0][-1].weight); init.constant_(self.compress_layers[0][-1].bias, 0.0)
-            self.compress_layers[1].append(nn.Conv2d(channels, channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)).to(device))
+            self.compress_layers[1].append(nn.Conv2d(channels, channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
             init.orthogonal_(self.compress_layers[1][-1].weight); init.constant_(self.compress_layers[1][-1].bias, 0.0)
 
-            self.map_layers.append(nn.Conv2d(channels // 4, 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)).to(device))
+            self.map_layers.append(nn.Conv2d(channels // 4, 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
             init.orthogonal_(self.map_layers[-1].weight); init.constant_(self.map_layers[-1].bias, 0.0)
 
             channels //= 2
-        self.cost_layers.append(nn.Conv2d(channels * 2, channels, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)).to(device))
-        # self.cost_layers.append(nn.Conv2d(channels * 2, channels, kernel_size = (2, 2), stride = (2, 2)))
+        self.cost_layers.append(nn.Conv2d(channels * 2, channels, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
         init.orthogonal_(self.cost_layers[-1].weight); init.constant_(self.cost_layers[-1].bias, 0.0)
-        self.cost_layers.reverse( )
+        self.cost_layers = nn.ModuleList(reversed(self.cost_layers))
 
-        self.layers = list( )
-        for map_layer in self.map_layers: self.layers.append(map_layer)
-        for cost_layer in self.cost_layers: self.layers.append(cost_layer)
-        for upscale_layer in self.upscale_layers[0]: self.layers.append(upscale_layer)
-        for upscale_layer in self.upscale_layers[1]: self.layers.append(upscale_layer)
-        for compress_layer in self.compress_layers[0]: self.layers.append(compress_layer)
-        for compress_layer in self.compress_layers[1]: self.layers.append(compress_layer)
         
     def forward(self, input, cost_volume):
         # input cost should be of dimension (N, C, H, W)

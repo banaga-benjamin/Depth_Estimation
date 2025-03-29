@@ -10,15 +10,11 @@ class PoseDecoder(nn.Module):
         super( ).__init__( )
         
         self.device = device
-        self.conv_elu = list( )
-        self.conv = nn.Conv2d(in_channels // 2, 6, kernel_size = (1, 1), stride = (1, 1)).to(device)
-        self.conv_elu.append(nn.Conv2d(in_channels, in_channels // 2, kernel_size = (1,1), stride = (1, 1)).to(device))
-        self.conv_elu.append(nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)).to(device))
-        self.conv_elu.append(nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)).to(device))
-
-        self.layers = list( )
-        self.layers.append(self.conv)
-        for conv_elu in self.conv_elu: self.layers.append(conv_elu)
+        self.conv_elu = nn.ModuleList( )
+        self.conv = nn.Conv2d(in_channels // 2, 6, kernel_size = (1, 1), stride = (1, 1))
+        self.conv_elu.append(nn.Conv2d(in_channels, in_channels // 2, kernel_size = (1,1), stride = (1, 1)))
+        self.conv_elu.append(nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
+        self.conv_elu.append(nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
     
 
     def forward(self, target_feature, src_feature):

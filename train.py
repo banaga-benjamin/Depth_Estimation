@@ -18,10 +18,8 @@ from torch.utils.data import DataLoader
 
 def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_decoder: depth_decoder.DepthDecoder, convgru: depth_convgru.ConvGru,
                     p_encoder: pose_encoder.PoseEncoder, p_decoder: pose_decoder.PoseDecoder, optimizer, device: str = "cpu"):
-    # set height, width, and depths
-    # for cost volume calculation
-    H = 192; W = 640
-    depths = 64; cost_height = H // 2; cost_width = W // 2
+    # set height, width, and depths for cost volume calculation
+    cost_depths = 64; cost_height = 192 // 2; cost_width = 640 // 2
 
     # calculate intrinsic matrix for cost volume
     intrinsic_mat = torch.Tensor(
@@ -57,7 +55,7 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
                 pose_mat = func_utils.construct_pose(p_decoder_output, device)
 
                 # synthesize images for computing cost volume
-                synthesized_imgs = func_utils.synthesize_from_depths(intrinsic_mat, intrinsic_inv, pose_mat, depths,
+                synthesized_imgs = func_utils.synthesize_from_depths(intrinsic_mat, intrinsic_inv, pose_mat, cost_depths,
                                                                      cost_width, cost_height, img_seq[idx], device).detach( )
 
                 # compute the cost volume relative to source image
@@ -119,31 +117,17 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(train_data, batch_size = BATCH_SIZE, num_workers = NUM_WORKERS // 2,
                                   shuffle = True, drop_last = True)
     
-    convgru = depth_convgru.ConvGru(device = device)
-    d_encoder = depth_encoder.DepthEncoder(device = device)
-    d_decoder = depth_decoder.DepthDecoder(device = device)
+    convgru = depth_convgru.ConvGru( ).to(device)
+    d_encoder = depth_encoder.DepthEncoder( ).to(device)
+    d_decoder = depth_decoder.DepthDecoder( ).to(device)
 
-    p_encoder = pose_encoder.PoseEncoder(device = device)
-    p_decoder = pose_decoder.PoseDecoder(device = device)
-    
-    convgru_parameters = list( )
-    for name, param in convgru.named_parameters( ):
-        if param.requires_grad: convgru_parameters.append(param)
-
-    d_decoder_parameters = list( )
-    for layer in d_decoder.layers:
-        for name, param in layer.named_parameters( ):
-            if param.requires_grad: d_decoder_parameters.append(param)
-
-    p_decoder_parameters = list( )
-    for layer in p_decoder.layers:
-        for name, param in layer.named_parameters( ):
-            if param.requires_grad: p_decoder_parameters.append(param)
+    p_encoder = pose_encoder.PoseEncoder( ).to(device)
+    p_decoder = pose_decoder.PoseDecoder(device = device).to(device)
 
     optimizer = torch.optim.SGD([
-        {'params': convgru_parameters, 'lr': 1e-3},
-        {'params': d_decoder_parameters, 'lr': 1e-3},
-        {'params': p_decoder_parameters, 'lr': 1e-3}
+        {'params': convgru.parameters( ), 'lr': 1e-3},
+        {'params': d_encoder.parameters( ), 'lr': 1e-3},
+        {'params': p_decoder.parameters( ), 'lr': 1e-3}
     ])
 
     EPOCHS = 1; print("Number of Epochs:", EPOCHS, "\n")
