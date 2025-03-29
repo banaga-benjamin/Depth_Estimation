@@ -49,3 +49,19 @@ def regularization_term(depths, target_imgs):
     depth_x = depth_x.mean( ).abs( ); depth_y = depth_y.mean( ).abs( )
     target_x = target_x.mean( ).abs( ); target_y = target_y.mean( ).abs( )
     return depth_x * torch.exp(-target_x) + depth_y * torch.exp(-target_y)
+
+
+def rmse(pred_depths, depths):
+    return torch.sqrt(functional.mse_loss(pred_depths, depths))
+
+
+def rmsle(pred_depths, depths, eps = 1e-6):
+    return rmse(torch.log(pred_depths + eps), torch.log(depths + eps))
+
+
+def abs_rel(pred_depths, depths, eps = 1e-6):
+    return torch.mean(torch.abs(pred_depths - depths) / (depths + eps))
+
+
+def sq_rel(pred_depths, depths, eps = 1e-6):
+    return torch.mean(((pred_depths - depths) ** 2) / (depths + eps))
