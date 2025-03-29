@@ -49,9 +49,10 @@ class ConvGru(nn.Module):
             self.prev_states[idx] = self.prev_states[idx].detach( )
         
         # aggregate depth outputs by resizingg and taking the average of the sum of depths
+        # additionally pass through sigmoid for output normalization
         H = 192 // (2 ** (len(outputs) - 2)); W = 640 // (2 ** (len(outputs) - 2))
         for idx in range(len(outputs) - 1):
-            outputs[idx] = functional.interpolate(outputs[idx], size = (H, W), mode = "bilinear")
+            outputs[idx] = functional.interpolate(outputs[idx], size = (H, W), mode = "bicubic")
             outputs[idx + 1] += outputs[idx]
             H *= 2; W *= 2
-        return outputs[-1] / len(outputs)
+        return functional.sigmoid(outputs[-1] / len(outputs))

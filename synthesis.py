@@ -1,5 +1,4 @@
 import torch
-from numpy import arange
 from torch.nn import functional
 
 
@@ -37,15 +36,12 @@ def synthesize(src_img, proj_pixels):
 
 def synthesize_from_depths(intrinsic_mat, intrinsic_inv, pose_mat, depths, width, height, src_img, device):
     synthesized_imgs = list( )
-    depths = arange(0, 80, 80 / depths)
-
-    # for each depth in supplied depths
-    for depth in depths:
+    for depth in depths: # for each depth in supplied depths
         # create a uniform depth map
         depth_map = torch.ones(height, width, device = device) * depth
 
         # project some target image to the source image
-        proj_pixels = reproject_from_depth(pose_mat, depth_map, width, height, device, intrinsic_mat, intrinsic_inv)
+        proj_pixels = reproject_from_depth(intrinsic_mat, intrinsic_inv, pose_mat, depth_map, width, height, device)
 
         # synthesize the target image
         synthesized_img = synthesize(src_img, proj_pixels)
@@ -56,21 +52,9 @@ def synthesize_from_depths(intrinsic_mat, intrinsic_inv, pose_mat, depths, width
     return torch.stack(synthesized_imgs)
 
 
-def reproject_from_depth(pose_mat, depth_map, width = 640, height = 192, device = "cpu", intrinsic_mat = None, intrinsic_inv = None):
+def reproject_from_depth(intrinsic_mat, intrinsic_inv, pose_mat, depth_map, width = 640, height = 192, device = "cpu"):
     # intrinsic matrices are specified as 4 x 4 matrices
     # suitable for homogenous coordinate transformations
-
-    # if no intrinsic matrices are supplied
-    if intrinsic_mat is None:
-        intrinsic_mat = torch.Tensor(
-            [[0.58, 0.00, 0.50, 0.00],
-            [0.00, 1.92, 0.50, 0.00],
-            [0.00, 0.00, 1.00, 0.00],
-            [0.00, 0.00, 0.00, 1.00]]
-        ).to(device)
-
-        intrinsic_mat[0, :] *= width; intrinsic_mat[1, :] *= height
-        intrinsic_inv = torch.linalg.pinv(intrinsic_mat)
 
     # create a matrix of 4d pixel coordinates
     x_coords = torch.arange(width, dtype = torch.float32, device = device)
@@ -103,7 +87,7 @@ def reproject_from_depth(pose_mat, depth_map, width = 640, height = 192, device 
 
     # convert 3d homogenous pixel coordinates to 2d pixel coordinates
     x = output_pixels[..., 0]; y = output_pixels[..., 1]; z = output_pixels[..., 2]
-    z = torch.where(z == 0, torch.ones_like(z), z)
+    z = torch.where(z == 0, torch.ones_like(z) * 1e-6, z)
     output_pixels = torch.stack([x / z, y / z], dim = 2)
 
     return output_pixels

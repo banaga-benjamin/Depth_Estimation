@@ -1,9 +1,9 @@
 from time import time
-from os import cpu_count
 
 import metrics
 import dataset
 import synthesis
+import constants
 
 from networks import depth_encoder
 from networks import depth_decoder
@@ -20,21 +20,10 @@ from torch.utils.data import DataLoader
 
 
 def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_decoder: depth_decoder.DepthDecoder, convgru: depth_convgru.ConvGru,
-                    p_encoder: pose_encoder.PoseEncoder, p_decoder: pose_decoder.PoseDecoder, optimizer, device: str = "cpu"):
-    # set height, width, and depths for cost volume calculation
-    cost_depths = 64; cost_height = 192 // 2; cost_width = 640 // 2
+                    p_encoder: pose_encoder.PoseEncoder, p_decoder: pose_decoder.PoseDecoder, optimizer, device: str = "cpu", sid = False):
+    if sid: DEPTHS = constants.SID_DEPTHS
+    else: DEPTHS = constants.UID_DEPTHS
 
-    # calculate intrinsic matrix for cost volume
-    intrinsic_mat = torch.Tensor(
-            [[0.58, 0.00, 0.50, 0.00],
-            [0.00, 1.92, 0.50, 0.00],
-            [0.00, 0.00, 1.00, 0.00],
-            [0.00, 0.00, 0.00, 1.00]]
-        ).to(device)
-
-    intrinsic_mat[0, :] *= cost_width; intrinsic_mat[1, :] *= cost_height
-    intrinsic_inv = torch.linalg.pinv(intrinsic_mat)
-    
     start_time = time( )
     num_batches = len(dataloader.dataset) // dataloader.batch_size
     print("Number of Batches:", num_batches, "\n")
@@ -59,12 +48,12 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
 
             # synthesize images for computing cost volumes
             synthesized_imgs = [
-                synthesis.synthesize_from_depths(intrinsic_mat, intrinsic_inv, pose_mats[idx], cost_depths,
-                                                  cost_width, cost_height, img_seq[idx], device).detach( )
+                synthesis.synthesize_from_depths(constants.COST_INTRINSIC_MAT.to(device), constants.COST_INTRINSIC_INV.to(device), pose_mats[idx], DEPTHS,
+                                                  constants.COST_WIDTH, constants.COST_HEIGHT, img_seq[idx], device).detach( )
                 for idx in range(len(img_seq) - 1)]
 
             # compute the cost volumes relative to source images
-            resized_target_img = functional.interpolate(img_seq[-1].unsqueeze(dim = 0), size = (cost_height, cost_width), mode = "bilinear")
+            resized_target_img = functional.interpolate(img_seq[-1].unsqueeze(dim = 0), size = (constants.COST_HEIGHT, constants.COST_WIDTH), mode = "bilinear")
             cost_volumes = metrics.cost_volumes(resized_target_img, torch.stack(synthesized_imgs))
 
             # obtain depth outputs from depth decoder -> convgru
@@ -72,7 +61,7 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
                 
             # synthesize the source images from the target image and final depth predictions
             proj_pixels = torch.stack([
-                synthesis.reproject_from_depth(pose_mats[idx], depth_outputs[idx], device = device)
+                synthesis.reproject_from_depth(constants.IMG_INTRINSIC_MAT.to(device), constants.IMG_INTRINSIC_INV.to(device), pose_mats[idx], depth_outputs[idx], device = device)
                 for idx in range(len(img_seq) - 1)
                 ], dim = 0)
 
@@ -112,14 +101,13 @@ if __name__ == "__main__":
     print("\nnote: trained models will be saved at 'trained_models' folder")
 
     train_transform = transforms.Compose([
-        transforms.TrivialAugmentWide(num_magnitude_bins = 15),
-        transforms.Resize((192, 640)),
+        transforms.TrivialAugmentWide(num_magnitude_bins = constants.NUM_RANDOM_TRANS),
+        transforms.Resize((constants.HEIGHT, constants.WIDTH)),
         transforms.ToTensor( )
     ])
 
-    BATCH_SIZE = 4; NUM_WORKERS = cpu_count( )
-    train_data = dataset.TrainingData(seq_len = 4, device = device, transform = train_transform)
-    train_dataloader = DataLoader(train_data, batch_size = BATCH_SIZE, num_workers = NUM_WORKERS // 2,
+    train_data = dataset.TrainingData(seq_len = constants.SEQ_LEN, device = device, transform = train_transform)
+    train_dataloader = DataLoader(train_data, batch_size = constants.BATCH_SIZE, num_workers = constants.NUM_WORKERS // 2,
                                   shuffle = True, drop_last = True)
     
     convgru = depth_convgru.ConvGru( ).to(device)
@@ -138,12 +126,11 @@ if __name__ == "__main__":
     folder = Path("trained_models")
     folder.mkdir(exist_ok = True)  # create folder if needed
 
-    EPOCHS = 1
-    for epoch in range(EPOCHS):
+    for epoch in range(constants.EPOCHS):
         print( ); print("-" * 50)
-        print("Current Epoch:", epoch + 1, " / ", EPOCHS)
+        print("Current Epoch:", epoch + 1, " / ", constants.EPOCHS)
         d_decoder.train( ); p_decoder.train( ); convgru.train( )
-        train_step(train_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, optimizer, device)
+        train_step(train_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, optimizer, device, sid = False)
 
         # save model weights
         torch.save(convgru.state_dict( ), folder / f"convgru_weights_{epoch}.pth")
