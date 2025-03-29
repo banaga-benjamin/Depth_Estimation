@@ -36,8 +36,10 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
     num_batches = len(dataloader.dataset) // dataloader.batch_size
     print("Number of Batches:", num_batches, "\n")
     for batch, img_batch in enumerate(dataloader):
-        # initialize loss
-        overall_loss = 0
+        # create lists for computation of loss
+        target_imgs_list = list( )
+        output_imgs_list = list( )
+        depth_outputs_list = list( )
 
         for img_seq in img_batch:
             # target image has dimensions (C, H, W)
@@ -73,9 +75,14 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
 
             output_imgs = func_utils.synthesize(src_imgs, proj_pixels)
 
-            # update overall loss
-            overall_loss += func_utils.regularization_term(depth_outputs, torch.stack([target_img] * (len(img_seq) - 1), dim = 0))
-            overall_loss += func_utils.reprojection_loss(output_imgs, torch.stack([target_img] * (len(img_seq) - 1), dim = 0))
+            # update lists used in computation of loss
+            target_imgs_list.append(torch.stack([target_img] * (len(img_seq) - 1), dim = 0))
+            output_imgs_list.append(output_imgs)
+            depth_outputs_list.append(depth_outputs)
+
+        # calculate overall loss
+        overall_loss = func_utils.regularization_term(torch.cat(depth_outputs_list, dim = 0), torch.cat(target_imgs_list, dim = 0))
+        overall_loss += func_utils.reprojection_loss(torch.cat(output_imgs_list, dim = 0), torch.cat(target_imgs_list, dim = 0))
 
         # perform backpropagation
         optimizer.zero_grad( )
