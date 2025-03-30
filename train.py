@@ -119,9 +119,9 @@ if __name__ == "__main__":
     p_decoder = pose_decoder.PoseDecoder(device = device).to(device)
 
     optimizer = torch.optim.SGD([
-        {'params': convgru.parameters( ), 'lr': 1e-3},
-        {'params': d_encoder.parameters( ), 'lr': 1e-3},
-        {'params': p_decoder.parameters( ), 'lr': 1e-3}
+        {'params': convgru.parameters( ), 'lr': 1e-4},
+        {'params': d_encoder.parameters( ), 'lr': 1e-4},
+        {'params': p_decoder.parameters( ), 'lr': 1e-4}
     ])
 
     folder = Path("trained_models")
