@@ -4,6 +4,7 @@ from os import cpu_count
 
 
 # constants for image dimensions
+MAX_DEPTH = 80
 HEIGHT = 192; WIDTH = 640
 COST_HEIGHT = 96; COST_WIDTH = 320
 
