@@ -31,13 +31,13 @@ def reprojection_loss(preds, targets):
     SSIM_n = (2 * mu_x * mu_y + (0.01 ** 2)) * (2 * sigma_xy + (0.03 ** 2))
     SSIM_d = (mu_x ** 2 + mu_y ** 2 + (0.01 ** 2)) * (sigma_x + sigma_y + (0.03 ** 2))
 
-    ssim_loss = torch.clamp((1 - SSIM_n / SSIM_d) / 2, 0, 1).mean(dim = 1, keepdim = True)
+    ssim_loss = torch.clamp((1 - SSIM_n / SSIM_d) / 2, 0, 1).mean(dim = 1, keepdim = True).mean( )
 
     # compute L1 loss
-    l1_loss = torch.abs(targets - preds).mean(dim = 1, keepdim = True)
+    l1_loss = torch.abs(targets - preds).mean( )
 
     # return the mean of the reprojection error
-    return (0.05 * ssim_loss + 0.15 * l1_loss).mean( )
+    return (0.85 * ssim_loss) + (0.15 * l1_loss)
 
 
 def regularization_term(depths, target_imgs):
@@ -46,9 +46,9 @@ def regularization_term(depths, target_imgs):
     target_x, target_y = torch.gradient(target_imgs, dim = (-2, -1))
 
     # get the absolute values of the means of the gradients
-    depth_x = depth_x.mean( ).abs( ); depth_y = depth_y.mean( ).abs( )
-    target_x = target_x.mean( ).abs( ); target_y = target_y.mean( ).abs( )
-    return depth_x * torch.exp(-target_x) + depth_y * torch.exp(-target_y)
+    depth_x = depth_x.abs( ); depth_y = depth_y.abs( )
+    target_x = target_x.abs( ); target_y = target_y.abs( )
+    return torch.mean(depth_x * torch.exp(-target_x) + depth_y * torch.exp(-target_y))
 
 
 def rmse(pred_depths, depths):

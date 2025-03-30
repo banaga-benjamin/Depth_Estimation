@@ -31,7 +31,6 @@ def test_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_d
     cumulative_sq_rel = 0
     cumulative_abs_rel = 0
 
-
     start_time = time( )
     num_batches = len(dataloader.dataset) // dataloader.batch_size
     print("Number of Batches:", num_batches, "\n")
@@ -96,7 +95,7 @@ def test_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_d
     print("RMSE:\t\t", (cumulative_rmse / num_batches).item( ) * constants.MAX_DEPTH)     # RMSE is not scale independent
     print("RMSLE:\t\t", (cumulative_rmsle / num_batches).item( ))
     print("Sq Rel:\t\t", (cumulative_sq_rel / num_batches).item( ))
-    print("Abs Rel:\t\t", (cumulative_abs_rel / num_batches).item( ))
+    print("Abs Rel:\t", (cumulative_abs_rel / num_batches).item( ))
     print("-" * 50)
 
     print("\ntime elapsed:", elapsed_time / 60, "minutes")
@@ -129,14 +128,15 @@ if __name__ == "__main__":
 
     # load trained models
     if load_train == "Y":
-        print("Input path to trained pose decoder: ", end = "")
+        print("input path to trained pose decoder: ", end = "")
         p_decoder.load_state_dict(torch.load(input( )))
         
-        print("Input path to trained depth decoder: ", end = "")
+        print("input path to trained depth decoder: ", end = "")
         d_decoder.load_state_dict(torch.load(input( )))
         
-        print("Input path to trained convgru model: ", end = "")
+        print("input path to trained convgru model: ", end = "")
         convgru.load_state_dict(torch.load(input( )))
+    print( )
 
     d_decoder.eval( ); p_decoder.eval( ); convgru.eval( )
     with torch.no_grad( ): test_step(test_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, device)

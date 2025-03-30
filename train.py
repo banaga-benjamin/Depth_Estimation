@@ -109,7 +109,7 @@ if __name__ == "__main__":
 
     train_data = dataset.TrainingData(seq_len = constants.SEQ_LEN, device = device, transform = train_transform)
     train_dataloader = DataLoader(train_data, batch_size = constants.BATCH_SIZE, num_workers = constants.NUM_WORKERS // 2,
-                                  shuffle = True, drop_last = True)
+                                  persistent_workers = True, shuffle = True, drop_last = True)
     
     convgru = depth_convgru.ConvGru( ).to(device)
     d_encoder = depth_encoder.DepthEncoder( ).to(device)
