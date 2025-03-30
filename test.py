@@ -26,6 +26,7 @@ def test_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_d
     else: DEPTHS = constants.UID_DEPTHS
 
     # initialize error metrics
+    cumulative = 0
     cumulative_rmse = 0
     cumulative_rmsle = 0
     cumulative_sq_rel = 0
@@ -75,11 +76,13 @@ def test_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_d
         ground_truth_stacked = torch.cat(ground_truths_list, dim = 0)
         depth_outputs_stacked = torch.cat(depth_outputs_list, dim = 0)
 
-        # accumulate error metrics
-        cumulative_rmse += metrics.rmse(depth_outputs_stacked, ground_truth_stacked)
-        cumulative_rmsle += metrics.rmsle(depth_outputs_stacked, ground_truth_stacked)
-        cumulative_sq_rel += metrics.sq_rel(depth_outputs_stacked, ground_truth_stacked)
-        cumulative_abs_rel += metrics.abs_rel(depth_outputs_stacked, ground_truth_stacked)
+        if torch.max(ground_truth_stacked).item( ) != 0:
+            # accumulate error metrics
+            cumulative += 1
+            cumulative_rmse += metrics.rmse(depth_outputs_stacked, ground_truth_stacked)
+            cumulative_rmsle += metrics.rmsle(depth_outputs_stacked, ground_truth_stacked)
+            cumulative_sq_rel += metrics.sq_rel(depth_outputs_stacked, ground_truth_stacked)
+            cumulative_abs_rel += metrics.abs_rel(depth_outputs_stacked, ground_truth_stacked)
 
 
         if batch % 100 == 0:
@@ -92,10 +95,10 @@ def test_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_d
     
     # print averages of accumulated error metrics
     print( ); print("-" * 50)
-    print("RMSE:\t\t", (cumulative_rmse / num_batches).item( ) * constants.MAX_DEPTH)     # RMSE is not scale independent
-    print("RMSLE:\t\t", (cumulative_rmsle / num_batches).item( ))
-    print("Sq Rel:\t\t", (cumulative_sq_rel / num_batches).item( ))
-    print("Abs Rel:\t", (cumulative_abs_rel / num_batches).item( ))
+    print("RMSE:\t\t", (cumulative_rmse / cumulative).item( ) * constants.MAX_DEPTH)     # RMSE is not scale independent
+    print("RMSLE:\t\t", (cumulative_rmsle / cumulative).item( ))
+    print("Sq Rel:\t\t", (cumulative_sq_rel / cumulative).item( ))
+    print("Abs Rel:\t", (cumulative_abs_rel / cumulative).item( ))
     print("-" * 50)
 
     print("\ntime elapsed:", elapsed_time / 60, "minutes")

@@ -52,20 +52,24 @@ def regularization_term(depths, target_imgs):
 
 
 def rmse(pred_depths, depths):
+    mask = (depths > 0) # apply masking to disregard zero depth values in ground truth
     # returns root of the mean squared error
-    return torch.sqrt(functional.mse_loss(pred_depths, depths))
+    return torch.sqrt(functional.mse_loss(pred_depths[mask], depths[mask]))
 
 
 def rmsle(pred_depths, depths, eps = 1e-6):
+    mask = (depths > 0) # apply masking to disregard zero depth values in ground truth
     # returns root of the mean squared error of log values
-    return rmse(torch.log(pred_depths + eps), torch.log(depths + eps))
+    return rmse(torch.log(pred_depths[mask] + eps) + eps, torch.log(depths[mask] + eps) + eps)
 
 
 def abs_rel(pred_depths, depths, eps = 1e-6):
+    mask = (depths > 0) # apply masking to disregard zero depth values in ground truth
     # returns the mean of the absolute relative error
-    return torch.mean(torch.abs(pred_depths - depths) / (depths + eps))
+    return torch.mean(torch.abs(pred_depths[mask] - depths[mask]) / (depths[mask] + eps))
 
 
 def sq_rel(pred_depths, depths, eps = 1e-6):
+    mask = (depths > 0) # apply masking to disregard zero depth values in ground truth
     # returns the mean of the squared relative error
-    return torch.mean(((pred_depths - depths) ** 2) / (depths + eps))
+    return torch.mean(((pred_depths[mask] - depths[mask]) ** 2) / (depths[mask] + eps))
