@@ -12,7 +12,7 @@ def cost_volumes(target_img, synthesized_imgs):
     return (target_imgs - synthesized_imgs).mean(dim = 2)
 
 
-def reprojection_loss(preds, targets):
+def reprojection_error(preds, targets):
     # target and predicted images should be of dimensions (N, C, H, W)
     if targets.dim( ) < 4: targets = targets.unsqueeze(dim = 0)
     if preds.dim( ) < 4: preds = preds.unsqueeze(dim = 0)
@@ -31,7 +31,17 @@ def reprojection_loss(preds, targets):
     SSIM_n = (2 * mu_x * mu_y + (0.01 ** 2)) * (2 * sigma_xy + (0.03 ** 2))
     SSIM_d = (mu_x ** 2 + mu_y ** 2 + (0.01 ** 2)) * (sigma_x + sigma_y + (0.03 ** 2))
 
-    ssim_loss = torch.clamp((1 - SSIM_n / SSIM_d) / 2, 0, 1).mean( )
+    ssim_loss = torch.clamp((1 - SSIM_n / SSIM_d) / 2, 0, 1)
+    return ssim_loss
+
+
+def reprojection_loss(preds, sources, targets):
+    preds_ssim_loss = reprojection_error(preds, targets)
+    src_ssim_loss = reprojection_error(sources, targets)
+
+    # mask ssim loss of predictions images
+    masked_ssim_loss = torch.where(preds_ssim_loss > src_ssim_loss, preds_ssim_loss, torch.zeros_like(preds_ssim_loss))
+    ssim_loss = torch.mean(masked_ssim_loss)
 
     # compute L1 loss
     l1_loss = torch.abs(targets - preds).mean( )

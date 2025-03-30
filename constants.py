@@ -39,7 +39,7 @@ IMG_INTRINSIC_INV = torch.linalg.pinv(IMG_INTRINSIC_MAT)
 # constants related to training
 EPOCHS = 1
 SEQ_LEN = 4
-BATCH_SIZE = 4
+BATCH_SIZE = 2
 TEST_NUM_WORKERS = 0
 NUM_RANDOM_TRANS = 16 - 1
 NUM_WORKERS = cpu_count( )

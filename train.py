@@ -32,10 +32,10 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
     print("Number of Batches:", num_batches, "\n")
     for batch, img_batch in enumerate(dataloader):
         # create lists for computation of loss
+        src_imgs_list = list( )
         target_imgs_list = list( )
         output_imgs_list = list( )
         depth_outputs_list = list( )
-
 
         for img_seq in img_batch:
             # target image has dimensions (C, H, W)
@@ -53,7 +53,7 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
             # synthesize images for computing cost volumes
             synthesized_imgs = [
                 synthesis.synthesize_from_depths(constants.COST_INTRINSIC_MAT.to(device), constants.COST_INTRINSIC_INV.to(device), pose_mats[idx], DEPTHS,
-                                                  constants.COST_WIDTH, constants.COST_HEIGHT, img_seq[idx], device).detach( )
+                                                  constants.COST_WIDTH, constants.COST_HEIGHT, img_seq[idx], device)
                 for idx in range(len(img_seq) - 1)]
 
             # compute the cost volumes relative to source images
@@ -73,12 +73,13 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
 
             # update lists used in computation of loss
             target_imgs_list.append(torch.stack([target_img] * (len(img_seq) - 1), dim = 0))
-            output_imgs_list.append(output_imgs)
             depth_outputs_list.append(depth_outputs)
+            output_imgs_list.append(output_imgs)
+            src_imgs_list.append(src_imgs)
 
         # calculate overall loss
         overall_loss = metrics.regularization_term(torch.cat(depth_outputs_list, dim = 0), torch.cat(target_imgs_list, dim = 0))
-        overall_loss += metrics.reprojection_loss(torch.cat(output_imgs_list, dim = 0), torch.cat(target_imgs_list, dim = 0))
+        overall_loss += metrics.reprojection_loss(torch.cat(output_imgs_list, dim = 0), torch.cat(src_imgs_list, dim = 0), torch.cat(target_imgs_list, dim = 0))
         
         cumulative_loss += overall_loss.item( )
         if batch % 50 == 0: print("average loss:", cumulative_loss / (batch + 1))
