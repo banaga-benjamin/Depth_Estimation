@@ -154,7 +154,10 @@ class TestingData(Dataset):
         depth = Image.open(self.test_depth[index])
         if self.transform: depth = self.transform(depth)
         if not torch.is_tensor(depth): depth = to_tensor(depth)
-        depth = depth.to(self.device)
+
+        # normalize depth and move to device
+        # assumes depth map is stored in uint16
+        depth = (depth / (2 ** 16)).to(self.device)
 
         return (img_seq, depth)
 

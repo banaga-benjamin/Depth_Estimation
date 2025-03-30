@@ -19,21 +19,27 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 
 
-def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_decoder: depth_decoder.DepthDecoder, convgru: depth_convgru.ConvGru,
-                    p_encoder: pose_encoder.PoseEncoder, p_decoder: pose_decoder.PoseDecoder, optimizer, device: str = "cpu"):
+def test_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_decoder: depth_decoder.DepthDecoder, convgru: depth_convgru.ConvGru,
+                    p_encoder: pose_encoder.PoseEncoder, p_decoder: pose_decoder.PoseDecoder, device: str = "cpu"):
     # determine which depths should be used in cost volume
     if constants.USE_SID: DEPTHS = constants.SID_DEPTHS
     else: DEPTHS = constants.UID_DEPTHS
 
+    # initialize error metrics
+    cumulative_rmse = 0
+    cumulative_rmsle = 0
+    cumulative_sq_rel = 0
+    cumulative_abs_rel = 0
+
+
     start_time = time( )
     num_batches = len(dataloader.dataset) // dataloader.batch_size
     print("Number of Batches:", num_batches, "\n")
-    for batch, img_batch in enumerate(dataloader):
-        # create lists for computation of loss
-        target_imgs_list = list( )
-        output_imgs_list = list( )
+    for batch, test_batch in enumerate(dataloader):
+        # create list of depth outputs
         depth_outputs_list = list( )
 
+        img_batch, ground_truth_batch = test_batch
         for img_seq in img_batch:
             # target image has dimensions (C, H, W)
             # image sequence has dimensions (N, C, H, W)
@@ -59,30 +65,23 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
 
             # obtain depth outputs from depth decoder -> convgru
             depth_outputs = convgru(d_decoder(d_encoder_outputs, cost_volumes))
-                
-            # synthesize the source images from the target image and final depth predictions
-            proj_pixels = torch.stack([
-                synthesis.reproject_from_depth(constants.IMG_INTRINSIC_MAT.to(device), constants.IMG_INTRINSIC_INV.to(device), pose_mats[idx], depth_outputs[idx], device = device)
-                for idx in range(len(img_seq) - 1)
-                ], dim = 0)
-
-            output_imgs = synthesis.synthesize(src_imgs, proj_pixels)
-
-            # update lists used in computation of loss
-            target_imgs_list.append(torch.stack([target_img] * (len(img_seq) - 1), dim = 0))
-            output_imgs_list.append(output_imgs)
             depth_outputs_list.append(depth_outputs)
 
-        # calculate overall loss
-        overall_loss = metrics.regularization_term(torch.cat(depth_outputs_list, dim = 0), torch.cat(target_imgs_list, dim = 0))
-        overall_loss += metrics.reprojection_loss(torch.cat(output_imgs_list, dim = 0), torch.cat(target_imgs_list, dim = 0))
+        # preprocess ground truths to align shape with depth outputs
+        ground_truths_list = list( )
+        for idx in range(constants.BATCH_SIZE):
+            ground_truths_list.append(torch.stack([ground_truth_batch[idx]] * (constants.SEQ_LEN - 1)))
 
-        # perform backpropagation
-        optimizer.zero_grad( )
-        overall_loss.backward( )
-        optimizer.step( )
+        # convert depth outputs list and ground truths list to tensors
+        ground_truth_stacked = torch.cat(ground_truths_list, dim = 0)
+        depth_outputs_stacked = torch.cat(depth_outputs_list, dim = 0)
 
-        torch.cuda.empty_cache( )
+        # accumulate error metrics
+        cumulative_rmse += metrics.rmse(depth_outputs_stacked, ground_truth_stacked)
+        cumulative_rmsle += metrics.rmsle(depth_outputs_stacked, ground_truth_stacked)
+        cumulative_sq_rel += metrics.sq_rel(depth_outputs_stacked, ground_truth_stacked)
+        cumulative_abs_rel += metrics.abs_rel(depth_outputs_stacked, ground_truth_stacked)
+
 
         if batch % 100 == 0:
             if batch == 0: continue
@@ -91,6 +90,15 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
             print("batches completed:", batch)
             print("time remaining:", (elapsed_time / (batch + 1)) * (num_batches - batch - 1) / 60 , "minutes")
             print("-" * 50, "\n")
+    
+    # print averages of accumulated error metrics
+    print( ); print("-" * 50)
+    print("RMSE:\t", (cumulative_rmse / num_batches).item( ))
+    print("RMSLE:\t", cumulative_rmsle / num_batches.item( ))
+    print("Sq Rel:\t", cumulative_sq_rel / num_batches.item( ))
+    print("Abs Rel:\t", cumulative_abs_rel / num_batches.item( ))
+    print("-" * 50)
+
     print("\ntime elapsed:", elapsed_time / 60, "minutes")
 
 
@@ -99,17 +107,14 @@ if __name__ == "__main__":
 
     device = 'cuda' if torch.cuda.is_available( ) else 'cpu'
     print("using device:", device)
-    print("\nnote: trained models will be saved at 'trained_models' folder")
 
-    train_transform = transforms.Compose([
-        transforms.TrivialAugmentWide(num_magnitude_bins = constants.NUM_RANDOM_TRANS),
+    test_transform = transforms.Compose([
         transforms.Resize((constants.HEIGHT, constants.WIDTH)),
         transforms.ToTensor( )
     ])
 
-    train_data = dataset.TrainingData(seq_len = constants.SEQ_LEN, device = device, transform = train_transform)
-    train_dataloader = DataLoader(train_data, batch_size = constants.BATCH_SIZE, num_workers = constants.NUM_WORKERS // 2,
-                                  shuffle = True, drop_last = True)
+    test_data = dataset.TestingData(seq_len = constants.SEQ_LEN, device = device, transform = test_transform)
+    test_dataloader = DataLoader(test_data, batch_size = constants.BATCH_SIZE, num_workers = constants.NUM_WORKERS // 2, drop_last = True)
     
     convgru = depth_convgru.ConvGru( ).to(device)
     d_encoder = depth_encoder.DepthEncoder( ).to(device)
@@ -118,22 +123,20 @@ if __name__ == "__main__":
     p_encoder = pose_encoder.PoseEncoder( ).to(device)
     p_decoder = pose_decoder.PoseDecoder(device = device).to(device)
 
-    optimizer = torch.optim.SGD([
-        {'params': convgru.parameters( ), 'lr': 1e-3},
-        {'params': d_encoder.parameters( ), 'lr': 1e-3},
-        {'params': p_decoder.parameters( ), 'lr': 1e-3}
-    ])
+    # get input for loading trained models
+    print("load trained model? [Y/N]: ", end = "")
+    load_train = input( )
 
-    folder = Path("trained_models")
-    folder.mkdir(exist_ok = True)  # create folder if needed
+    # load trained models
+    if load_train == "Y":
+        print("Input path to trained pose decoder: ", end = "")
+        p_decoder.load_state_dict(torch.load(input( )))
+        
+        print("Input path to trained depth decoder: ", end = "")
+        d_decoder.load_state_dict(torch.load(input( )))
+        
+        print("Input path to trained convgru model: ", end = "")
+        convgru.load_state_dict(torch.load(input( )))
 
-    for epoch in range(constants.EPOCHS):
-        print( ); print("-" * 50)
-        print("Current Epoch:", epoch + 1, " / ", constants.EPOCHS)
-        d_decoder.train( ); p_decoder.train( ); convgru.train( )
-        train_step(train_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, optimizer, device)
-
-        # save model weights
-        torch.save(convgru.state_dict( ), folder / f"convgru_weights_{epoch}.pth")
-        torch.save(d_decoder.state_dict( ), folder / f"depth_decoder_weights_{epoch}.pth")
-        torch.save(p_decoder.state_dict( ), folder / f"pose_decoder_weights_{epoch}.pth")
+    d_decoder.eval( ); p_decoder.eval( ); convgru.eval( )
+    with torch.no_grad( ): test_step(test_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, device)
