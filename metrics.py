@@ -61,7 +61,7 @@ def rmse(pred_depths, depths):
 def rmsle(pred_depths, depths, eps = 1e-6):
     mask = (depths > 0) # apply masking to disregard zero depth values in ground truth
     # returns root of the mean squared error of log values
-    return rmse(torch.log(pred_depths[mask] + eps), torch.log(depths[mask] + eps))
+    return torch.sqrt(functional.mse_loss(torch.log(pred_depths[mask] + eps), torch.log(depths[mask] + eps)))
 
 
 def abs_rel(pred_depths, depths, eps = 1e-6):

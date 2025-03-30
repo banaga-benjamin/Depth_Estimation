@@ -124,8 +124,8 @@ if __name__ == "__main__":
     p_encoder = pose_encoder.PoseEncoder( ).to(device)
     p_decoder = pose_decoder.PoseDecoder(device = device).to(device)
 
-    optimizer = torch.optim.Adam(chain(convgru.parameters( ), d_decoder.parameters( ), p_decoder.parameters( )), lr = 1e-3, betas = (0.9, 0.99))
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda step: min(step / (constants.EPOCHS * len(train_dataloader)), 1.0))
+    optimizer = torch.optim.Adam(chain(convgru.parameters( ), d_decoder.parameters( ), p_decoder.parameters( )), lr = 1e-4, betas = (0.9, 0.99))
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda step: min(step / (constants.EPOCHS * len(train_dataloader) / 10), 1.0))
 
     folder = Path("trained_models")
     folder.mkdir(exist_ok = True)  # create folder if needed
@@ -137,6 +137,6 @@ if __name__ == "__main__":
         train_step(train_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, optimizer, scheduler, device)
 
         # save model weights
-        torch.save(convgru.state_dict( ), folder / f"convgru_weights_{epoch + 1}.pth")
-        torch.save(d_decoder.state_dict( ), folder / f"depth_decoder_weights_{epoch + 1}.pth")
-        torch.save(p_decoder.state_dict( ), folder / f"pose_decoder_weights_{epoch + 1}.pth")
+        torch.save(convgru.state_dict( ), folder / f"convgru_{epoch}.pth")
+        torch.save(d_decoder.state_dict( ), folder / f"depth_decoder_{epoch}.pth")
+        torch.save(p_decoder.state_dict( ), folder / f"pose_decoder_{epoch}.pth")

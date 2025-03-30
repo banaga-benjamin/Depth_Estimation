@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from torchvision import transforms
 from torch.utils.data import Dataset
 
@@ -108,10 +109,16 @@ class TestingData(Dataset):
             for image_subdirectory, depth_subdirectory in zip(image_subdirectories, depth_subdirectories):
                 test_left[image_subdirectory] = list( )
                 test_depth[depth_subdirectory] = list( )
-                for left_img, depth in zip((image_subdirectory / "image_02/data").iterdir( ), (depth_subdirectory / "proj_depth/groundtruth/image_02").iterdir( )):
-                    if left_img.suffix != ".png" or depth.suffix != ".png": continue
+
+                for left_img in (image_subdirectory / "image_02/data").iterdir( ):
+                    if left_img.suffix != ".png": continue
                     test_left[image_subdirectory].append(left_img)
+                for depth in (depth_subdirectory / "proj_depth/groundtruth/image_02").iterdir( ):
+                    if depth.suffix != ".png": continue
                     test_depth[depth_subdirectory].append(depth)
+
+                # for alignment
+                test_left[image_subdirectory] = test_left[image_subdirectory][5:-5]
 
         # concatenate adjacent images to sequences of specified length and match with corresponding depths
         seq_test_left = [ ]
@@ -155,10 +162,8 @@ class TestingData(Dataset):
         if self.transform: depth = self.transform(depth)
         if not torch.is_tensor(depth): depth = to_tensor(depth)
 
-        # normalize depth and move to device
-        # assumes depth map is stored in uint16
+        # normalize depth map and set to device
         depth = (depth / (2 ** 16)).to(self.device)
-
         return (img_seq, depth)
 
 

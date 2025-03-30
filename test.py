@@ -72,17 +72,26 @@ def test_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_d
         for idx in range(constants.BATCH_SIZE):
             ground_truths_list.append(torch.stack([ground_truth_batch[idx]] * (constants.SEQ_LEN - 1)))
 
-        # convert depth outputs list and ground truths list to tensors
         ground_truth_stacked = torch.cat(ground_truths_list, dim = 0)
         depth_outputs_stacked = torch.cat(depth_outputs_list, dim = 0)
 
         if torch.max(ground_truth_stacked).item( ) != 0:
             # accumulate error metrics
             cumulative += 1
-            cumulative_rmse += metrics.rmse(depth_outputs_stacked, ground_truth_stacked)
+            cumulative_rmse += metrics.rmse(depth_outputs_stacked, ground_truth_stacked) * constants.MAX_DEPTH  # RMSE is not scale independent
             cumulative_rmsle += metrics.rmsle(depth_outputs_stacked, ground_truth_stacked)
             cumulative_sq_rel += metrics.sq_rel(depth_outputs_stacked, ground_truth_stacked)
             cumulative_abs_rel += metrics.abs_rel(depth_outputs_stacked, ground_truth_stacked)
+
+        if batch % 50 == 0: # error logs
+            if batch == 0: continue
+            if cumulative == 0: continue
+            print("batch:", batch)
+            print("rmse:", (cumulative_rmse / cumulative).item( ))
+            print("rmsle:", (cumulative_rmsle / cumulative).item( ))
+            print("sq rel:", (cumulative_sq_rel / cumulative).item( ))
+            print("abs rel:", (cumulative_abs_rel / cumulative).item( ))
+            print( )
 
 
         if batch % 100 == 0:
@@ -95,7 +104,7 @@ def test_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_d
     
     # print averages of accumulated error metrics
     print( ); print("-" * 50)
-    print("RMSE:\t\t", (cumulative_rmse / cumulative).item( ) * constants.MAX_DEPTH)     # RMSE is not scale independent
+    print("RMSE:\t\t", (cumulative_rmse / cumulative).item( ))
     print("RMSLE:\t\t", (cumulative_rmsle / cumulative).item( ))
     print("Sq Rel:\t\t", (cumulative_sq_rel / cumulative).item( ))
     print("Abs Rel:\t", (cumulative_abs_rel / cumulative).item( ))
@@ -116,7 +125,7 @@ if __name__ == "__main__":
     ])
 
     test_data = dataset.TestingData(seq_len = constants.SEQ_LEN, device = device, transform = test_transform)
-    test_dataloader = DataLoader(test_data, batch_size = constants.BATCH_SIZE, num_workers = constants.NUM_WORKERS // 2, drop_last = True)
+    test_dataloader = DataLoader(test_data, batch_size = constants.BATCH_SIZE, num_workers = constants.TEST_NUM_WORKERS, drop_last = True)
     
     convgru = depth_convgru.ConvGru( ).to(device)
     d_encoder = depth_encoder.DepthEncoder( ).to(device)
