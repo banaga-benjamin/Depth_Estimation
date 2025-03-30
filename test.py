@@ -94,9 +94,9 @@ def test_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_d
     # print averages of accumulated error metrics
     print( ); print("-" * 50)
     print("RMSE:\t", (cumulative_rmse / num_batches).item( ) * constants.MAX_DEPTH)     # RMSE is not scale independent
-    print("RMSLE:\t", cumulative_rmsle / num_batches.item( ))
-    print("Sq Rel:\t", cumulative_sq_rel / num_batches.item( ))
-    print("Abs Rel:\t", cumulative_abs_rel / num_batches.item( ))
+    print("RMSLE:\t", (cumulative_rmsle / num_batches).item( ))
+    print("Sq Rel:\t", (cumulative_sq_rel / num_batches).item( ))
+    print("Abs Rel:\t", (cumulative_abs_rel / num_batches).item( ))
     print("-" * 50)
 
     print("\ntime elapsed:", elapsed_time / 60, "minutes")

@@ -134,6 +134,6 @@ if __name__ == "__main__":
         train_step(train_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, optimizer, device)
 
         # save model weights
-        torch.save(convgru.state_dict( ), folder / f"convgru_weights_{epoch}.pth")
-        torch.save(d_decoder.state_dict( ), folder / f"depth_decoder_weights_{epoch}.pth")
-        torch.save(p_decoder.state_dict( ), folder / f"pose_decoder_weights_{epoch}.pth")
+        torch.save(convgru.state_dict( ), folder / f"convgru_weights_{epoch + 1}.pth")
+        torch.save(d_decoder.state_dict( ), folder / f"depth_decoder_weights_{epoch + 1}.pth")
+        torch.save(p_decoder.state_dict( ), folder / f"pose_decoder_weights_{epoch + 1}.pth")
