@@ -23,26 +23,26 @@ class DepthDecoder(nn.Module):
         for scale in range(self.scales):
             if scale != 3:
                 self.cost_layers.append(nn.Conv2d(channels // 4, channels // 2, kernel_size = (2, 2), stride = (2, 2)))
-                init.orthogonal_(self.cost_layers[-1].weight); init.constant_(self.cost_layers[-1].bias, 0.0)
+                init.kaiming_normal_(self.cost_layers[-1].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.cost_layers[-1].bias)
 
             self.upscale_layers[0].append(nn.ConvTranspose2d(channels, channels // 2, kernel_size = (2, 2), stride = (2, 2)))
             self.upscale_layers[1].append(nn.ConvTranspose2d(channels // 2, channels // 4, kernel_size = (2, 2), stride = (2, 2)))
 
-            init.orthogonal_(self.upscale_layers[0][-1].weight); init.constant_(self.upscale_layers[0][-1].bias, 0.0)
-            init.orthogonal_(self.upscale_layers[1][-1].weight); init.constant_(self.upscale_layers[1][-1].bias, 0.0)
+            init.kaiming_normal_(self.upscale_layers[0][-1].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.upscale_layers[0][-1].bias)
+            init.kaiming_normal_(self.upscale_layers[1][-1].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.upscale_layers[1][-1].bias)
 
             if scale != 0:
                 self.compress_layers[0].append((nn.Conv2d(channels * 2, channels, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1))))
-                init.orthogonal_(self.compress_layers[0][-1].weight); init.constant_(self.compress_layers[0][-1].bias, 0.0)
+                init.kaiming_normal_(self.compress_layers[0][-1].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.compress_layers[0][-1].bias)
             self.compress_layers[1].append(nn.Conv2d(channels, channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
-            init.orthogonal_(self.compress_layers[1][-1].weight); init.constant_(self.compress_layers[1][-1].bias, 0.0)
+            init.kaiming_normal_(self.compress_layers[1][-1].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.compress_layers[1][-1].bias)
 
             self.map_layers.append(nn.Conv2d(channels // 4, 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
-            init.orthogonal_(self.map_layers[-1].weight); init.constant_(self.map_layers[-1].bias, 0.0)
+            init.kaiming_normal_(self.map_layers[-1].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.map_layers[-1].bias)
 
             channels //= 2
         self.cost_layers.append(nn.Conv2d(channels * 2, channels, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
-        init.orthogonal_(self.cost_layers[-1].weight); init.constant_(self.cost_layers[-1].bias, 0.0)
+        init.kaiming_normal_(self.cost_layers[-1].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.cost_layers[-1].bias)
         self.cost_layers = nn.ModuleList(reversed(self.cost_layers))
 
         

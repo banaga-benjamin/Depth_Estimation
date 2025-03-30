@@ -15,9 +15,9 @@ class PoseDecoder(nn.Module):
         self.conv_elu.append(nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
         self.conv_elu.append(nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
     
-        init.orthogonal_(self.conv.weight); init.constant_(self.conv.bias, 0.0)
+        init.kaiming_normal_(self.conv.weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.conv.bias)
         for conv_elu in self.conv_elu:
-            init.orthogonal_(conv_elu.weight); init.constant_(conv_elu.bias, 0.0)
+            init.kaiming_normal_(conv_elu.weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(conv_elu.bias)
 
     def forward(self, target_feature, src_features):
         # target feature should have dimensions (1, C, H, W)

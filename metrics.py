@@ -43,7 +43,8 @@ def reprojection_loss(preds, targets):
 def regularization_term(depths, target_imgs):
     # get the gradients along the x and y axes
     depth_x, depth_y = torch.gradient(depths, dim = (-2, -1))
-    target_x, target_y = torch.gradient(target_imgs, dim = (-2, -1))
+    # normalize target image before computing gradients
+    target_x, target_y = torch.gradient(functional.sigmoid(target_imgs), dim = (-2, -1))    
 
     # get the absolute values of the means of the gradients
     depth_x = depth_x.abs( ); depth_y = depth_y.abs( )
@@ -60,7 +61,7 @@ def rmse(pred_depths, depths):
 def rmsle(pred_depths, depths, eps = 1e-6):
     mask = (depths > 0) # apply masking to disregard zero depth values in ground truth
     # returns root of the mean squared error of log values
-    return rmse(torch.log(pred_depths[mask] + eps) + eps, torch.log(depths[mask] + eps) + eps)
+    return rmse(torch.log(pred_depths[mask] + eps), torch.log(depths[mask] + eps))
 
 
 def abs_rel(pred_depths, depths, eps = 1e-6):
