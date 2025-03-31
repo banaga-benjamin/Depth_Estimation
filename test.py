@@ -72,8 +72,9 @@ def test_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_d
         for idx in range(constants.BATCH_SIZE):
             ground_truths_list.append(torch.stack([ground_truth_batch[idx]] * (constants.SEQ_LEN - 1)))
 
-        ground_truth_stacked = torch.cat(ground_truths_list, dim = 0)
-        depth_outputs_stacked = torch.cat(depth_outputs_list, dim = 0) * constants.MAX_DEPTH    # note to rescale to [0, 80]
+        # note to rescale to [0, 80]
+        ground_truth_stacked = torch.cat(ground_truths_list, dim = 0) * constants.MAX_DEPTH
+        depth_outputs_stacked = torch.cat(depth_outputs_list, dim = 0) * constants.MAX_DEPTH
 
         if torch.max(ground_truth_stacked).item( ) != 0:
             # accumulate error metrics
