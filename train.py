@@ -111,7 +111,8 @@ if __name__ == "__main__":
     train_transform = transforms.Compose([
         transforms.TrivialAugmentWide(num_magnitude_bins = constants.NUM_RANDOM_TRANS),
         transforms.Resize((constants.HEIGHT, constants.WIDTH)),
-        transforms.ToTensor( )
+        transforms.ToTensor( ),
+        transforms.Normalize(mean = [0.485, 0.456, 0.406], stid = [0.229, 0.224, 0.225])    # normalize using imagenet normalization
     ])
 
     train_data = dataset.TrainingData(seq_len = constants.SEQ_LEN, device = device, transform = train_transform)

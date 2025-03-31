@@ -73,12 +73,12 @@ def test_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_d
             ground_truths_list.append(torch.stack([ground_truth_batch[idx]] * (constants.SEQ_LEN - 1)))
 
         ground_truth_stacked = torch.cat(ground_truths_list, dim = 0)
-        depth_outputs_stacked = torch.cat(depth_outputs_list, dim = 0)
+        depth_outputs_stacked = torch.cat(depth_outputs_list, dim = 0) * constants.MAX_DEPTH    # note to rescale to [0, 80]
 
         if torch.max(ground_truth_stacked).item( ) != 0:
             # accumulate error metrics
             cumulative += 1
-            cumulative_rmse += metrics.rmse(depth_outputs_stacked, ground_truth_stacked) * constants.MAX_DEPTH  # RMSE is not scale independent
+            cumulative_rmse += metrics.rmse(depth_outputs_stacked, ground_truth_stacked)
             cumulative_rmsle += metrics.rmsle(depth_outputs_stacked, ground_truth_stacked)
             cumulative_sq_rel += metrics.sq_rel(depth_outputs_stacked, ground_truth_stacked)
             cumulative_abs_rel += metrics.abs_rel(depth_outputs_stacked, ground_truth_stacked)
