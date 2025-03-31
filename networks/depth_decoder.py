@@ -92,5 +92,5 @@ class DepthDecoder(nn.Module):
             # map feature to a single channel
             output = self.map_layers[scale](output)
 
-            outputs.append(output)
+            outputs.append(functional.sigmoid(output))
         return outputs

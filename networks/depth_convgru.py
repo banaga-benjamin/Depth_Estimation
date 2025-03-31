@@ -55,4 +55,5 @@ class ConvGru(nn.Module):
             outputs[idx] = functional.interpolate(outputs[idx], size = (H, W), mode = "bicubic")
             outputs[idx + 1] += outputs[idx]
             H *= 2; W *= 2
-        return functional.sigmoid(outputs[-1] / self.scale)
+        return torch.clamp(outputs[-1] / self.scale, min = 0, max = 1)
+        # return functional.sigmoid(outputs[-1] / self.scale)
