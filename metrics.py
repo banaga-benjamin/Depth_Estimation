@@ -36,9 +36,9 @@ def reprojection_error(preds, targets):
 
 
 def reprojection_loss(preds, targets):
-    # compute L1 loss and SSIM
-    ssim_losses = reprojection_error(preds, targets)
+    # compute L1 losses and SSIM losses
     l1_losses = torch.abs(targets - preds)
+    ssim_losses = reprojection_error(preds, targets)
     reprojection_losses = (0.85 * ssim_losses) + (0.15 * l1_losses)
 
     reprojection_loss = reprojection_losses[0]

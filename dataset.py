@@ -1,17 +1,16 @@
 import torch
 import numpy as np
-from torchvision import transforms
 from torch.utils.data import Dataset
+import torchvision.transforms.functional as tf
 
 from PIL import Image
 from pathlib import Path
 
 
 class TrainingData(Dataset):
-    def __init__(self, seq_len: int, device, transform = None, image_path = "kitti_data") -> None:
+    def __init__(self, seq_len: int, device, image_path = "kitti_data") -> None:
         self.device = device
         self.seq_len = seq_len
-        self.transform = transform
 
         # convert image path to path object
         image_path = Path(image_path)
@@ -54,13 +53,20 @@ class TrainingData(Dataset):
 
 
     def __getitem__(self, index: int) -> torch.Tensor:
+        # determine augmentations
+        flip = torch.rand(1) < 0.5
+        angle = (torch.rand(1) * 30 - 15).item( )
+
         # returns a sequence of images indexed by index
         img_seq = list( )
-        to_tensor = transforms.Compose([transforms.ToTensor( )])
         for img_path in self.image_paths[index: index + self.seq_len]:
             img = Image.open(img_path)
-            if self.transform: img = self.transform(img)
-            if not torch.is_tensor(img): img = to_tensor(img)
+
+            # flip and rotate
+            if flip: img = tf.hflip(img)
+            img = tf.rotate(img, angle)
+
+            img = tf.to_tensor(tf.resize(img, size = (192, 640)))
             img_seq.append(img)
         
         img_seq = torch.stack(img_seq)
@@ -69,9 +75,8 @@ class TrainingData(Dataset):
 
 
 class TestingData(Dataset):
-    def __init__(self, seq_len: int, device, transform = None, image_path = "kitti_data", depth_path = "data_depth_annotated") -> None:
+    def __init__(self, seq_len: int, device, image_path = "kitti_data", depth_path = "data_depth_annotated") -> None:
         self.device = device
-        self.transform = transform
     
         # set training data subdirectory
         image_path = Path(image_path)
@@ -140,19 +145,16 @@ class TestingData(Dataset):
     def __getitem__(self, index: int) -> torch.Tensor:
         # collect sequence of images indexed by index
         img_seq = list( )
-        to_tensor = transforms.Compose([transforms.ToTensor( )])
         for img_path in self.test_left[index]:
             img = Image.open(img_path)
-            if self.transform: img = self.transform(img)
-            if not torch.is_tensor(img): img = to_tensor(img)
+            img = tf.to_tensor(tf.resize(img, size = (192, 640)))
             img_seq.append(img)
         img_seq = torch.stack(img_seq)
         img_seq = img_seq.to(self.device)
 
         # pair with corresponding depth
         depth = Image.open(self.test_depth[index])
-        if self.transform: depth = self.transform(depth)
-        if not torch.is_tensor(depth): depth = to_tensor(depth)
+        depth = tf.to_tensor(tf.resize(depth, size = (192, 640)))
 
         # normalize depth map to [0, 1] and set to device
         depth = (depth / (2 ** 16)).to(self.device)

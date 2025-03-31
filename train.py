@@ -86,9 +86,10 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
 
             masked_reprojection = torch.where(output_reprojection > src_reprojection, output_reprojection, torch.zeros_like(output_reprojection))
             overall_loss += torch.mean(masked_reprojection + regularization_term)
-                    
+        overall_loss /= (constants.SEQ_LEN - 1)
+          
         cumulative_loss += overall_loss.item( )
-        if batch % 50 == 0: print("average loss:", cumulative_loss / (batch + 1))
+        if batch % 50 == 0 and batch != 0: print("average loss:", cumulative_loss / (batch + 1))
 
         # perform backpropagation
         optimizer.zero_grad( )
@@ -114,13 +115,7 @@ if __name__ == "__main__":
     print("using device:", device)
     print("\nnote: trained models will be saved at 'trained_models' folder")
 
-    train_transform = transforms.Compose([
-        transforms.TrivialAugmentWide(num_magnitude_bins = constants.NUM_RANDOM_TRANS),
-        transforms.Resize((constants.HEIGHT, constants.WIDTH)),
-        transforms.ToTensor( )
-    ])
-
-    train_data = dataset.TrainingData(seq_len = constants.SEQ_LEN, device = device, transform = train_transform)
+    train_data = dataset.TrainingData(seq_len = constants.SEQ_LEN, device = device)
     train_dataloader = DataLoader(train_data, batch_size = constants.BATCH_SIZE, num_workers = constants.NUM_WORKERS, shuffle = True, drop_last = True)
     
     convgru = depth_convgru.ConvGru( ).to(device)
@@ -130,7 +125,7 @@ if __name__ == "__main__":
     p_encoder = pose_encoder.PoseEncoder( ).to(device)
     p_decoder = pose_decoder.PoseDecoder(device = device).to(device)
 
-    optimizer = torch.optim.AdamW(chain(convgru.parameters( ), d_decoder.parameters( ), p_decoder.parameters( )), lr = 1e-4)
+    optimizer = torch.optim.AdamW(chain(convgru.parameters( ), d_decoder.parameters( ), p_decoder.parameters( )), lr = 1e-3)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = constants.EPOCHS * len(train_dataloader), eta_min = 1e-6)
 
     folder = Path("trained_models")

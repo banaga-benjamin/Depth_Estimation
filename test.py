@@ -120,12 +120,7 @@ if __name__ == "__main__":
     device = 'cuda' if torch.cuda.is_available( ) else 'cpu'
     print("using device:", device)
 
-    test_transform = transforms.Compose([
-        transforms.Resize((constants.HEIGHT, constants.WIDTH)),
-        transforms.ToTensor( )
-    ])
-
-    test_data = dataset.TestingData(seq_len = constants.SEQ_LEN, device = device, transform = test_transform)
+    test_data = dataset.TestingData(seq_len = constants.SEQ_LEN, device = device)
     test_dataloader = DataLoader(test_data, batch_size = constants.BATCH_SIZE, num_workers = constants.NUM_WORKERS, drop_last = True)
     
     convgru = depth_convgru.ConvGru( ).to(device)
