@@ -115,8 +115,7 @@ if __name__ == "__main__":
     ])
 
     train_data = dataset.TrainingData(seq_len = constants.SEQ_LEN, device = device, transform = train_transform)
-    train_dataloader = DataLoader(train_data, batch_size = constants.BATCH_SIZE, num_workers = constants.NUM_WORKERS // 2,
-                                  persistent_workers = True, shuffle = True, drop_last = True)
+    train_dataloader = DataLoader(train_data, batch_size = constants.BATCH_SIZE, num_workers = constants.NUM_WORKERS, shuffle = True, drop_last = True)
     
     convgru = depth_convgru.ConvGru( ).to(device)
     d_encoder = depth_encoder.DepthEncoder( ).to(device)
@@ -125,8 +124,8 @@ if __name__ == "__main__":
     p_encoder = pose_encoder.PoseEncoder( ).to(device)
     p_decoder = pose_decoder.PoseDecoder(device = device).to(device)
 
-    optimizer = torch.optim.Adam(chain(convgru.parameters( ), d_decoder.parameters( ), p_decoder.parameters( )), lr = 1e-3, betas = (0.9, 0.99))
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda step: min(step / (constants.EPOCHS * len(train_dataloader)), 1.0))
+    optimizer = torch.optim.NAdam(chain(convgru.parameters( ), d_decoder.parameters( ), p_decoder.parameters( )), lr = 1e-4)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = len(train_dataloader) // 4, eta_min = 1e-5)
 
     folder = Path("trained_models")
     folder.mkdir(exist_ok = True)  # create folder if needed

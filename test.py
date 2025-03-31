@@ -125,7 +125,7 @@ if __name__ == "__main__":
     ])
 
     test_data = dataset.TestingData(seq_len = constants.SEQ_LEN, device = device, transform = test_transform)
-    test_dataloader = DataLoader(test_data, batch_size = constants.BATCH_SIZE, num_workers = constants.TEST_NUM_WORKERS, drop_last = True)
+    test_dataloader = DataLoader(test_data, batch_size = constants.BATCH_SIZE, num_workers = constants.NUM_WORKERS, drop_last = True)
     
     convgru = depth_convgru.ConvGru( ).to(device)
     d_encoder = depth_encoder.DepthEncoder( ).to(device)
