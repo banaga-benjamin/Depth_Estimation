@@ -78,9 +78,15 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
             src_imgs_list.append(src_imgs)
 
         # calculate overall loss
-        overall_loss = metrics.regularization_term(torch.cat(depth_outputs_list, dim = 0), torch.cat(target_imgs_list, dim = 0))
-        overall_loss += metrics.reprojection_loss(torch.cat(output_imgs_list, dim = 0), torch.cat(src_imgs_list, dim = 0), torch.cat(target_imgs_list, dim = 0))
-        
+        overall_loss = 0
+        for src_imgs, target_imgs, output_imgs, depth_outputs in zip(src_imgs_list, target_imgs_list, output_imgs_list, depth_outputs_list):
+            regularization_term = metrics.regularization_term(depth_outputs, target_imgs)
+            output_reprojection = metrics.reprojection_loss(output_imgs, target_imgs)
+            src_reprojection = metrics.reprojection_loss(src_imgs, target_imgs)
+
+            masked_reprojection = torch.where(output_reprojection > src_reprojection, output_reprojection, torch.zeros_like(output_reprojection))
+            overall_loss += torch.mean(masked_reprojection + regularization_term)
+                    
         cumulative_loss += overall_loss.item( )
         if batch % 50 == 0: print("average loss:", cumulative_loss / (batch + 1))
 
@@ -111,8 +117,7 @@ if __name__ == "__main__":
     train_transform = transforms.Compose([
         transforms.TrivialAugmentWide(num_magnitude_bins = constants.NUM_RANDOM_TRANS),
         transforms.Resize((constants.HEIGHT, constants.WIDTH)),
-        transforms.ToTensor( ),
-        transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])    # normalize using imagenet normalization
+        transforms.ToTensor( )
     ])
 
     train_data = dataset.TrainingData(seq_len = constants.SEQ_LEN, device = device, transform = train_transform)
@@ -126,7 +131,7 @@ if __name__ == "__main__":
     p_decoder = pose_decoder.PoseDecoder(device = device).to(device)
 
     optimizer = torch.optim.AdamW(chain(convgru.parameters( ), d_decoder.parameters( ), p_decoder.parameters( )), lr = 1e-4)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = constants.EPOCHS * len(train_dataloader), eta_min = 1e-5)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = constants.EPOCHS * len(train_dataloader), eta_min = 1e-6)
 
     folder = Path("trained_models")
     folder.mkdir(exist_ok = True)  # create folder if needed
