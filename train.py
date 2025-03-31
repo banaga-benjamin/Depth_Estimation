@@ -125,7 +125,7 @@ if __name__ == "__main__":
     p_decoder = pose_decoder.PoseDecoder(device = device).to(device)
 
     optimizer = torch.optim.AdamW(chain(convgru.parameters( ), d_decoder.parameters( ), p_decoder.parameters( )), lr = 1e-4)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = constants.EPOCHS, eta_min = 1e-5)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = constants.EPOCHS * len(train_dataloader), eta_min = 1e-5)
 
     folder = Path("trained_models")
     folder.mkdir(exist_ok = True)  # create folder if needed
