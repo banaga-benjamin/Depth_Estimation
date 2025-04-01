@@ -86,7 +86,7 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
 
             masked_reprojection = torch.where(output_reprojection > src_reprojection, output_reprojection, torch.zeros_like(output_reprojection))
             overall_loss += torch.mean(masked_reprojection + regularization_term)
-        overall_loss /= (constants.SEQ_LEN - 1)
+        overall_loss /= (constants.BATCH_SIZE)
           
         cumulative_loss += overall_loss.item( )
         if batch % 50 == 0 and batch != 0: print("average loss:", cumulative_loss / (batch + 1))

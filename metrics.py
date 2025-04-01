@@ -40,12 +40,7 @@ def reprojection_loss(preds, targets):
     l1_losses = torch.abs(targets - preds)
     ssim_losses = reprojection_error(preds, targets)
     reprojection_losses = (0.85 * ssim_losses) + (0.15 * l1_losses)
-
-    reprojection_loss = reprojection_losses[0]
-    for idx in range(1, len(reprojection_losses)):
-        if reprojection_losses[idx].mean( ) < reprojection_loss.mean( ):
-            reprojection_loss = reprojection_losses[idx]
-    return reprojection_loss
+    return reprojection_losses.min(dim = 0, keepdim = True)[0]
 
 
 def regularization_term(depths, target_imgs):
@@ -53,10 +48,10 @@ def regularization_term(depths, target_imgs):
     depth_x, depth_y = torch.gradient(depths, dim = (-2, -1))
     target_x, target_y = torch.gradient(target_imgs, dim = (-2, -1))
 
-    # get the absolute values of the means of the gradients
+    # get the absolute values of the gradients
     depth_x = depth_x.abs( ); depth_y = depth_y.abs( )
     target_x = target_x.abs( ); target_y = target_y.abs( )
-    return depth_x * torch.exp(-target_x) + depth_y * torch.exp(-target_y)
+    return torch.mean(depth_x * torch.exp(-target_x) + depth_y * torch.exp(-target_y), dim = 0, keepdim = True)
 
 
 def rmse(pred_depths, depths):
