@@ -16,43 +16,24 @@ class ConvGru(nn.Module):
         init.orthogonal_(self.update_gate.weight); init.constant_(self.update_gate.bias, 0.0)
         init.orthogonal_(self.output_gate.weight); init.constant_(self.output_gate.bias, 0.0)
 
-        self.scale = 4
-        self.prev_states = None
+        self.prev_state = None
 
 
-    def forward(self, input):        
-        # initialize previous states if there are none
-        if self.prev_states is None:
-            self.prev_states = list( )
-            for scale in range(self.scale):
-                self.prev_states.append(torch.zeros_like(input[scale]))
+    def forward(self, input):
+        # initialize previous state if there is none
+        if self.prev_state is None: self.prev_state = torch.zeros_like(input)
 
-        outputs = list( )
-        for scale in range(self.scale):
-            # concatenate input at current scale and previous state at current scale
-            stacked_inputs = torch.cat((input[scale], self.prev_states[scale]), dim = 1)
+        # concatenate input and previous state
+        stacked_inputs = torch.cat((input, self.prev_state), dim = 1)
 
-            # input concatenated features to update and reset gates
-            update = functional.sigmoid(self.update_gate(stacked_inputs))
-            reset = functional.sigmoid(self.reset_gate(stacked_inputs)); del stacked_inputs
+        # input concatenated features to update and reset gates
+        update = functional.sigmoid(self.update_gate(stacked_inputs))
+        reset = functional.sigmoid(self.reset_gate(stacked_inputs)); del stacked_inputs
 
-            # determine the candidate new state at current scale
-            candidate_new_state = functional.tanh(self.output_gate(torch.cat([input[scale], self.prev_states[scale] * reset], dim = 1))); del reset
+        # determine the candidate new state
+        candidate_new_state = functional.tanh(self.output_gate(torch.cat((input, self.prev_state * reset), dim = 1))); del reset
+        output = (self.prev_state * (1 - update)) + ((candidate_new_state) * update); del update
 
-            output = self.prev_states[scale] * (1 - update) + candidate_new_state * update; del update
+        self.prev_state = output.clone( ).detach( )
 
-            outputs.append(output)
-        
-        # save hidden state
-        self.prev_states = outputs.copy( )
-        for idx in range(len(self.prev_states)):
-            self.prev_states[idx] = self.prev_states[idx].detach( )
-        
-        # aggregate depth outputs by resizingg and taking the average of the sum of depths
-        H = 192 // (2 ** (self.scale - 2)); W = 640 // (2 ** (self.scale - 2))
-        for idx in range(self.scale - 1):
-            outputs[idx] = functional.interpolate(outputs[idx], size = (H, W), mode = "bicubic")
-            outputs[idx + 1] += outputs[idx]
-            H *= 2; W *= 2
-        return torch.clamp(outputs[-1] / self.scale, min = 0, max = 1)  # clamp to [0, 1]
-        # return functional.sigmoid(outputs[-1] / self.scale)
+        return torch.clamp(output, min = 0, max = 1)  # clamp to [0, 1]

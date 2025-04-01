@@ -120,7 +120,7 @@ if __name__ == "__main__":
     
     convgru = depth_convgru.ConvGru( ).to(device)
     d_encoder = depth_encoder.DepthEncoder( ).to(device)
-    d_decoder = depth_decoder.DepthDecoder( ).to(device)
+    d_decoder = depth_decoder.DepthDecoder(cost_channels = constants.COST_DEPTHS).to(device)
 
     p_encoder = pose_encoder.PoseEncoder( ).to(device)
     p_decoder = pose_decoder.PoseDecoder(device = device).to(device)

@@ -21,7 +21,7 @@ class PoseEncoder(nn.Module):
         self.layer3 = reference_model.layer3
         self.layer4 = reference_model.layer4
 
-        for parameter in self.parameters( ): parameter.requires_grad = False
+        # for parameter in self.parameters( ): parameter.requires_grad = False
 
 
     def forward(self, input):
