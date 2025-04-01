@@ -35,8 +35,5 @@ class PoseDecoder(nn.Module):
         conv_output = self.conv(conv_output)
         
         # get mean of features at each channel
-        output = torch.zeros(conv_output.size(dim = 0), conv_output.size(dim = 1), device = self.device)
-        for batch in range(conv_output.size(dim = 0)):
-            for channel in range(conv_output.size(dim = 1)):
-                output[batch][channel] = torch.mean(conv_output[batch][channel])
+        output = torch.mean(torch.mean(conv_output, dim = -1), dim = -2)
         return output
