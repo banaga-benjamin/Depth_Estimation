@@ -51,7 +51,18 @@ def regularization_term(depths, target_imgs):
     # get the absolute values of the gradients
     depth_x = depth_x.abs( ); depth_y = depth_y.abs( )
     target_x = target_x.abs( ); target_y = target_y.abs( )
-    return torch.mean(depth_x * torch.exp(-target_x) + depth_y * torch.exp(-target_y), dim = 0, keepdim = True)
+
+    # broadcast depth gradients to channels of target image
+    depth_x = torch.cat([depth_x] * target_x.size(dim = 1), dim = 1)
+    depth_y = torch.cat([depth_y] * target_y.size(dim = 1), dim = 1)
+    
+    return torch.mean(depth_x / torch.exp(target_x) + depth_y / torch.exp(target_y), dim = 0, keepdim = True)
+
+
+def depth_regularization(depths):
+    # penalty for values very close to zero and values very close to one
+    depth_mean = torch.mean(torch.mean(depths, dim = (1, 2, 3)))
+    return (1 / torch.exp(12 * depth_mean)) + (1 / torch.exp(1 - depth_mean))
 
 
 def rmse(pred_depths, depths):

@@ -83,9 +83,10 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
             regularization_term = metrics.regularization_term(depth_outputs, target_imgs)
             output_reprojection = metrics.reprojection_loss(output_imgs, target_imgs)
             src_reprojection = metrics.reprojection_loss(src_imgs, target_imgs)
+            depth_regularization = metrics.depth_regularization(depth_outputs)
 
             masked_reprojection = torch.where(output_reprojection > src_reprojection, output_reprojection, torch.zeros_like(output_reprojection))
-            overall_loss += torch.mean(masked_reprojection + regularization_term)
+            overall_loss += torch.mean(torch.mean(2 * masked_reprojection + 0.5 * regularization_term, dim = (1, 2, 3))) + (0.5 * depth_regularization)
         overall_loss /= (constants.BATCH_SIZE)
           
         cumulative_loss += overall_loss.item( )
