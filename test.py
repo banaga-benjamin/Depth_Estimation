@@ -43,7 +43,7 @@ def test_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_d
         for img_seq in img_batch:
             # target image has dimensions (C, H, W)
             # image sequence has dimensions (N, C, H, W)
-            target_img = img_seq[-1]; src_imgs = img_seq[:-1]
+            target_img = img_seq[-1]
 
             # obtain depth encoder output from target image
             d_encoder_outputs = d_encoder(target_img)
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     
     convgru = depth_convgru.ConvGru( ).to(device)
     d_encoder = depth_encoder.DepthEncoder( ).to(device)
-    d_decoder = depth_decoder.DepthDecoder( ).to(device)
+    d_decoder = depth_decoder.DepthDecoder(cost_channels = constants.COST_DEPTHS).to(device)
 
     p_encoder = pose_encoder.PoseEncoder( ).to(device)
     p_decoder = pose_decoder.PoseDecoder(device = device).to(device)
