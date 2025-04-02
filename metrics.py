@@ -55,24 +55,32 @@ def regularization_term(depths, target_imgs):
 
 
 def rmse(pred_depths, depths):
-    mask = (depths > 0) # apply masking to disregard zero depth values in ground truth
-    # returns root of the mean squared error
-    return torch.sqrt(functional.mse_loss(pred_depths[mask], depths[mask]))
+    # calculate errors only for values for which depths > 0
+    errors = torch.where(depths > 0, torch.square(pred_depths - depths), torch.zeros_like(depths))
+    
+    # return root of the mean squared error of values
+    return torch.mean(torch.sqrt(torch.mean(errors, dim = (1, 2, 3))))
 
 
 def rmsle(pred_depths, depths, eps = 1e-6):
-    mask = (depths > 0) # apply masking to disregard zero depth values in ground truth
-    # returns root of the mean squared error of log values
-    return torch.sqrt(functional.mse_loss(torch.log(pred_depths[mask] + eps), torch.log(depths[mask] + eps)))
+    # calculate errors only for values for which depths > 0
+    errors = torch.where(depths > 0, torch.square(torch.log(pred_depths + eps) - torch.log(depths + eps)), torch.zeros_like(depths))
+    
+    # return root of the mean squared error of values
+    return torch.mean(torch.sqrt(torch.mean(errors, dim = (1, 2, 3))))
 
 
-def abs_rel(pred_depths, depths, eps = 1e-6):
-    mask = (depths > 0) # apply masking to disregard zero depth values in ground truth
-    # returns the mean of the absolute relative error
-    return torch.mean(torch.abs(pred_depths[mask] - depths[mask]) / (depths[mask] + eps))
+def abs_rel(pred_depths, depths):
+    # calculate errors only for values for which depths > 0
+    errors = torch.where(depths > 0, torch.abs(pred_depths - depths) / (depths), torch.zeros_like(depths))
+
+    # return squared relative errors
+    return torch.mean(torch.mean(errors, dim = (1, 2, 3)))
 
 
-def sq_rel(pred_depths, depths, eps = 1e-6):
-    mask = (depths > 0) # apply masking to disregard zero depth values in ground truth
-    # returns the mean of the squared relative error
-    return torch.mean(((pred_depths[mask] - depths[mask]) ** 2) / (depths[mask] + eps))
+def sq_rel(pred_depths, depths):
+    # calculate errors only for values for which depths > 0
+    errors = torch.where(depths > 0, torch.square(pred_depths - depths) / (depths), torch.zeros_like(depths))
+
+    # return squared relative errors
+    return torch.mean(torch.mean(errors, dim = (1, 2, 3)))
