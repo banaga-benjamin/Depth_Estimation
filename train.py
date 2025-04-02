@@ -21,7 +21,7 @@ from torch.utils.data import DataLoader
 
 
 def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_decoder: depth_decoder.DepthDecoder, convgru: depth_convgru.ConvGru,
-                    p_encoder: pose_encoder.PoseEncoder, p_decoder: pose_decoder.PoseDecoder, optimizer, scheduler, device: str = "cpu"):
+                    p_encoder: pose_encoder.PoseEncoder, p_decoder: pose_decoder.PoseDecoder, optimizer, device: str = "cpu"):
     # determine which depths should be used in cost volume
     if constants.USE_SID: DEPTHS = constants.SID_DEPTHS
     else: DEPTHS = constants.UID_DEPTHS
@@ -89,16 +89,16 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
         overall_loss /= (constants.BATCH_SIZE)
           
         cumulative_loss += overall_loss.item( )
-        if batch % 50 == 0 and batch != 0: print("average loss:", cumulative_loss / (batch + 1))
+        if batch % 125 == 0 and batch != 0: print("average loss:", cumulative_loss / (batch + 1))
 
         # perform backpropagation
         optimizer.zero_grad( )
         overall_loss.backward( )
-        optimizer.step( ); scheduler.step( )
+        optimizer.step( )
 
         torch.cuda.empty_cache( )
 
-        if batch % 100 == 0:
+        if batch % 250 == 0:
             if batch == 0: continue
             elapsed_time = (time( ) - start_time)
 
@@ -125,8 +125,8 @@ if __name__ == "__main__":
     p_encoder = pose_encoder.PoseEncoder( ).to(device)
     p_decoder = pose_decoder.PoseDecoder(device = device).to(device)
 
-    optimizer = torch.optim.AdamW(chain(convgru.parameters( ), d_decoder.parameters( ), p_decoder.parameters( )), lr = 1e-3)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = constants.EPOCHS * len(train_dataloader), eta_min = 1e-6)
+    optimizer = torch.optim.AdamW(chain(convgru.parameters( ), d_decoder.parameters( ), p_decoder.parameters( )), lr = 1e-4)
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = constants.EPOCHS * len(train_dataloader), eta_min = 1e-6)
 
     folder = Path("trained_models")
     folder.mkdir(exist_ok = True)  # create folder if needed
@@ -135,7 +135,7 @@ if __name__ == "__main__":
         print( ); print("-" * 50)
         print("Current Epoch:", epoch + 1, " / ", constants.EPOCHS)
         d_decoder.train( ); p_decoder.train( ); convgru.train( )
-        train_step(train_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, optimizer, scheduler, device)
+        train_step(train_dataloader, d_encoder, d_decoder, convgru, p_encoder, p_decoder, optimizer, device)
 
         # save model weights
         torch.save(convgru.state_dict( ), folder / f"convgru_{epoch}.pth")
