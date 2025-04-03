@@ -56,14 +56,14 @@ def regularization_term(depths, target_imgs):
     depth_x = torch.cat([depth_x] * target_x.size(dim = 1), dim = 1)
     depth_y = torch.cat([depth_y] * target_y.size(dim = 1), dim = 1)
     
-    return torch.mean(depth_x / torch.exp(target_x) + depth_y / torch.exp(target_y), dim = 0, keepdim = True)
+    return torch.mean(torch.mean(depth_x / torch.exp(2 * target_x) + depth_y / torch.exp(2 * target_y), dim = (1, 2, 3)))
 
 
 def depth_regularization(depths):
-    # penalty for values very close to zero and values very close to one
-    depth_max = torch.mean(torch.stack([torch.max(depth) for depth in depths]))
+    # penalty for values very close to zero
+    depth_max = torch.mean(torch.stack([torch.max(depth) for depth in depths])) 
     depth_mean = torch.mean(torch.mean(depths, dim = (1, 2, 3)))
-    return (1 / torch.exp(depth_max)) + (1 / torch.exp(8 * depth_mean)) +  (1 / torch.exp(1 - depth_mean))
+    return (1 / torch.exp(depth_max)) + (1 / torch.exp(64 * depth_mean)) + (1 / torch.exp(16 * (1 - depth_mean)))
 
 
 def rmse(pred_depths, depths):

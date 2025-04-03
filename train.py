@@ -86,10 +86,10 @@ def train_step(dataloader: DataLoader, d_encoder: depth_encoder.DepthEncoder, d_
             depth_regularization = metrics.depth_regularization(depth_outputs)
 
             masked_reprojection = torch.where(output_reprojection > src_reprojection, output_reprojection, torch.zeros_like(output_reprojection))
-            overall_loss += torch.mean(torch.mean(2 * masked_reprojection + 0.75 * regularization_term, dim = (1, 2, 3))) + (0.5 * depth_regularization)
+            overall_loss += torch.mean(torch.mean(masked_reprojection, dim = (1, 2, 3))) + 3e-4 * regularization_term + 1e-4 * depth_regularization
+            cumulative_loss += torch.mean(torch.mean(masked_reprojection, dim = (1, 2, 3))).item( )
         overall_loss /= (constants.BATCH_SIZE)
           
-        cumulative_loss += overall_loss.item( )
         if batch % 125 == 0 and batch != 0: print("average loss:", cumulative_loss / (batch + 1))
 
         # perform backpropagation
@@ -126,8 +126,7 @@ if __name__ == "__main__":
     p_encoder = pose_encoder.PoseEncoder( ).to(device)
     p_decoder = pose_decoder.PoseDecoder(device = device).to(device)
 
-    optimizer = torch.optim.AdamW(chain(convgru.parameters( ), d_decoder.parameters( ), p_decoder.parameters( )), lr = 1e-4)
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = constants.EPOCHS * len(train_dataloader), eta_min = 1e-6)
+    optimizer = torch.optim.NAdam(chain(convgru.parameters( ), d_decoder.parameters( ), p_decoder.parameters( )), lr = 1e-4)
 
     folder = Path("trained_models")
     folder.mkdir(exist_ok = True)  # create folder if needed
