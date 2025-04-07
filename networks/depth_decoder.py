@@ -8,53 +8,62 @@ class DepthDecoder(nn.Module):
     def __init__(self):
         super( ).__init__( )
 
-        # initialize batchnorm layers
-        self.batchnorms = nn.ModuleList( )
-        self.batchnorms.append(nn.BatchNorm2d(num_features = 128))
-        self.batchnorms.append(nn.BatchNorm2d(num_features = 2))
+        # initialize batchnorm, upscale, refinement, and compression layers
+        self.bns = nn.ModuleList( )
+        self.ups = nn.ModuleList( )
+        self.refs = nn.ModuleList( )
+        self.comps = nn.ModuleList( )
+        for channels in [512, 256, 128, 64]:
+            self.ups.append(nn.ModuleList( ))
+            self.refs.append(nn.ModuleList( ))
+            self.ups[-1].append(nn.ConvTranspose2d(channels, channels // 2, kernel_size = (2, 2), stride = (2, 2)))
+            self.refs[-1].append(nn.Conv2d(channels, channels, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
+
+            if channels == 64: continue
+            self.bns.append(nn.BatchNorm2d(num_features = channels // 2))
+            self.ups[-1].append(nn.ConvTranspose2d(channels // 2, channels // 4, kernel_size = (2, 2), stride = (2, 2)))
+            self.comps.append(nn.Conv2d(channels // 2, channels // 4, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
+            self.refs[-1].append(nn.Conv2d(channels // 2, channels // 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
         
-        # initialize upsampling blocks
-        self.conv_layers = nn.ModuleList( )
-        self.upscale_layers = nn.ModuleList( )
-        for channels in (512, 256, 128, 64):
-            self.conv_layers.append(nn.Conv2d(channels, channels, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
-            self.upscale_layers.append(nn.ConvTranspose2d(channels, channels // 2, kernel_size = (2, 2), stride = (2, 2)))
+        for ups in self.ups:
+            for up in ups: init.kaiming_normal_(up.weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(up.bias)
+        
+        for refs in self.refs:
+            for ref in refs: init.kaiming_normal_(ref.weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(ref.bias)
+        
+        for comp in self.comps: init.kaiming_normal_(comp.weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(comp.bias)
 
-            init.kaiming_normal_(self.conv_layers[-1].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.conv_layers[-1].bias)
-            init.kaiming_normal_(self.upscale_layers[-1].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.upscale_layers[-1].bias)
+        self.map_layer = (nn.Conv2d(32, 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
+        init.kaiming_normal_(self.map_layer.weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.map_layer.bias)
 
-        # initialize refinement layers
-        self.ref_layers = nn.ModuleList( )
-        self.ref_layers.append(nn.Conv2d(in_channels = 1, out_channels = 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
-        self.ref_layers.append(nn.Conv2d(in_channels = 1, out_channels = 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
-        self.ref_layers.append(nn.Conv2d(2, 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
+        # initialize layers for combining results
+        self.bn_comb = nn.BatchNorm2d(num_features = 2)
 
-        init.kaiming_normal_(self.ref_layers[0].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.ref_layers[0].bias)
-        init.kaiming_normal_(self.ref_layers[1].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.ref_layers[1].bias)
-        init.kaiming_normal_(self.ref_layers[2].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.ref_layers[2].bias)
+        self.refs_comb = nn.ModuleList( )
+        self.refs_comb.append(nn.Conv2d(1, 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
+        self.refs_comb.append(nn.Conv2d(1, 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
+        self.refs_comb.append(nn.Conv2d(2, 2, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
 
-        # initialize map/reduction layers
-        self.map_layers = nn.ModuleList( )
-        self.map_layers.append(nn.Conv2d(32, 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
-        self.map_layers.append(nn.Conv2d(2, 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
+        for ref_comb in self.refs_comb:
+            init.kaiming_normal_(ref_comb.weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(ref_comb.bias)
 
-        init.kaiming_normal_(self.map_layers[0].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.map_layers[0].bias)
-        init.kaiming_normal_(self.map_layers[1].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.map_layers[1].bias)
+        self.comp_comb = nn.Conv2d(2, 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1))
+        init.kaiming_normal_(self.comp_comb.weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.comp_comb.bias)
 
-                    
+
     def forward(self, input, candidate):
-        output = input
-        for idx, channels in enumerate([512, 256, 128, 64]):   # sequentially upsample input
-            output = functional.relu(self.upscale_layers[idx](functional.relu(self.conv_layers[idx](output)) + output))
-            if channels == 256: output = self.batchnorms[0](output)     # batch norm
-        
-        # map input to a single dimension, and refine input and candidate
-        output = functional.relu(self.ref_layers[0](functional.relu(self.map_layers[0](output))))
-        candidate = functional.relu(self.ref_layers[1](candidate))
+        # pass through convolutional layers to obtain temporary depth maps at scales
+        outputs = list( )
+        for idx, _ in enumerate([512, 256, 128, 64]):
+            outputs.append(functional.relu(self.ups[idx][0](self.refs[idx][0](input[idx]) + input[idx])))
 
-        # concatenate refined input and candidate and normalize
-        cat_feat = self.batchnorms[1](torch.cat([output, candidate], dim = 1))
+        # progressively combine depth maps at scales until final scale
+        for idx, _ in enumerate([256, 128, 64]):
+            temp = self.bns[idx](torch.cat([functional.relu(self.ups[idx][1](outputs[idx])), outputs[idx + 1]], dim = 1))
+            outputs[idx + 1] = functional.relu(self.comps[idx](self.refs[idx][1](temp) + temp))
+        output = functional.relu(self.map_layer(outputs[-1]))
 
-        # refine concatenated features and map to a single dimension
-        output = functional.relu(self.map_layers[1](functional.relu(self.ref_layers[2](cat_feat)) + cat_feat))
-        return output
+        # combine depth map at final scale with candidate depth map
+        temp = self.bn_comb(torch.cat([self.refs_comb[0](output), self.refs_comb[1](candidate)], dim = 1))
+        final_output = functional.relu(self.comp_comb(self.refs_comb[2](temp) + temp))
+        return final_output
