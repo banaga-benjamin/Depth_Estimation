@@ -93,7 +93,7 @@ def reproject_from_depth(intrinsic_mat: torch.Tensor, intrinsic_inv: torch.Tenso
 
 def depth_from_costs(cost_volumes: torch.Tensor, num_channels: int = 80, sid: bool = True, device: str = "cpu") -> torch.Tensor:
     # compute softmin weights (smaller cost → higher weight)
-    weights = functional.softmin(cost_volumes, dim = 1)
+    weights = functional.softmin(torch.square(torch.exp(cost_volumes)) - 1, dim = 1)
     
     # compute channels [0, 1, ..., C - 1] and reshape for broadcasting
     channels = torch.arange(num_channels, device = device).float( )
