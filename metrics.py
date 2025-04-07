@@ -2,32 +2,35 @@ import torch
 from torch.nn import functional
 
 
-def cost_volumes(target_img, synthesized_imgs):
-    # target image should be of dimension (C, H, W)
+def cost_volumes(target_img: torch.Tensor, synthesized_imgs: torch.Tensor) -> torch.Tensor:
+    # target image should be of dimension (C1, H, W)
+    # synthesized images are of dimension (C2, C1, H, W)
     if target_img.dim( ) > 3: target_img = target_img.squeeze( )
-    target_imgs = torch.stack([target_img] * len(synthesized_imgs[0]))
-    target_imgs = torch.stack([target_imgs] * len(synthesized_imgs))
+    target_imgs = torch.stack([target_img] * synthesized_imgs.size(dim = 0), dim = 0)
 
-    # get the mean of the differences along dimension C
-    return (target_imgs - synthesized_imgs).mean(dim = 2)
+    # get the mean along dimension C1 of the absolute value of the differences
+    return torch.abs(target_imgs - synthesized_imgs).mean(dim = 1)
 
 
-def reprojection_error(preds, targets):
+def reprojection_error(preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
     # target and predicted images should be of dimensions (N, C, H, W)
     if targets.dim( ) < 4: targets = targets.unsqueeze(dim = 0)
     if preds.dim( ) < 4: preds = preds.unsqueeze(dim = 0)
 
     # apply padding to retain dimensions
-    x = functional.pad(preds, pad = (1, 1, 1, 1), mode = 'reflect'); y = functional.pad(targets, pad = (1, 1, 1, 1), mode = 'reflect')
+    x = functional.pad(preds, pad = (1, 1, 1, 1), mode = 'reflect')
+    y = functional.pad(targets, pad = (1, 1, 1, 1), mode = 'reflect')
 
-    # compute the SSIM loss
+    # compute the means
     mu_x = functional.avg_pool2d(x, kernel_size = 3, stride = 1)
     mu_y = functional.avg_pool2d(y, kernel_size = 3, stride = 1)
 
+    # compute the variances and covariance
     sigma_x  = functional.avg_pool2d(x ** 2, kernel_size = 3, stride = 1) - mu_x ** 2
     sigma_y  = functional.avg_pool2d(y ** 2, kernel_size = 3, stride = 1) - mu_y ** 2
     sigma_xy = functional.avg_pool2d(x * y, kernel_size = 3, stride = 1) - mu_x * mu_y
 
+    # compute the numerator and denominator of SSIM
     SSIM_n = (2 * mu_x * mu_y + (0.01 ** 2)) * (2 * sigma_xy + (0.03 ** 2))
     SSIM_d = (mu_x ** 2 + mu_y ** 2 + (0.01 ** 2)) * (sigma_x + sigma_y + (0.03 ** 2))
 
@@ -35,18 +38,23 @@ def reprojection_error(preds, targets):
     return ssim_loss
 
 
-def reprojection_loss(preds, targets):
+def reprojection_loss(preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
     # compute L1 losses and SSIM losses
     l1_losses = torch.abs(targets - preds)
     ssim_losses = reprojection_error(preds, targets)
     reprojection_losses = (0.85 * ssim_losses) + (0.15 * l1_losses)
+
+    # get mean along channel dimension
+    reprojection_losses = torch.mean(reprojection_losses, dim = 1, keepdim = True)
+
+    # get the minimums along batch dimension
     return reprojection_losses.min(dim = 0, keepdim = True)[0]
 
 
-def regularization_term(depths, target_imgs):
+def regularization_term(depths: torch.Tensor, target_imgs: torch.Tensor) -> torch.Tensor:
     # get the gradients along the x and y axes
-    depth_x, depth_y = torch.gradient(depths, dim = (-2, -1))
-    target_x, target_y = torch.gradient(target_imgs, dim = (-2, -1))
+    depth_x, depth_y = torch.gradient(depths, dim = (-1, -2))
+    target_x, target_y = torch.gradient(target_imgs, dim = (-1, -2))
 
     # get the absolute values of the gradients
     depth_x = depth_x.abs( ); depth_y = depth_y.abs( )
@@ -55,18 +63,14 @@ def regularization_term(depths, target_imgs):
     # broadcast depth gradients to channels of target image
     depth_x = torch.cat([depth_x] * target_x.size(dim = 1), dim = 1)
     depth_y = torch.cat([depth_y] * target_y.size(dim = 1), dim = 1)
+
+    # get mean of regularization term along channel dimension
+    regularization_term = torch.mean(depth_x / torch.exp(target_x) + depth_y / torch.exp(target_y), dim = 1)
     
-    return torch.mean(torch.mean(depth_x / torch.exp(2 * target_x) + depth_y / torch.exp(2 * target_y), dim = (1, 2, 3)))
+    return torch.mean(regularization_term)
 
 
-def depth_regularization(depths):
-    # penalty for values very close to zero
-    depth_max = torch.mean(torch.stack([torch.max(depth) for depth in depths])) 
-    depth_mean = torch.mean(torch.mean(depths, dim = (1, 2, 3)))
-    return (1 / torch.exp(depth_max)) + (1 / torch.exp(64 * depth_mean)) + (1 / torch.exp(16 * (1 - depth_mean)))
-
-
-def rmse(pred_depths, depths):
+def rmse(pred_depths, depths: torch.Tensor) -> torch.Tensor:
     # calculate errors only for values for which depths > 0
     errors = torch.where(depths > 0, torch.square(pred_depths - depths), torch.zeros_like(depths))
     
@@ -74,23 +78,23 @@ def rmse(pred_depths, depths):
     return torch.mean(torch.sqrt(torch.mean(errors, dim = (1, 2, 3))))
 
 
-def rmsle(pred_depths, depths, eps = 1e-6):
+def rmsle(pred_depths: torch.Tensor, depths: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
     # calculate errors only for values for which depths > 0
     errors = torch.where(depths > 0, torch.square(torch.log(pred_depths + eps) - torch.log(depths + eps)), torch.zeros_like(depths))
     
-    # return root of the mean squared error of values
+    # return root of the mean squared error of log values
     return torch.mean(torch.sqrt(torch.mean(errors, dim = (1, 2, 3))))
 
 
-def abs_rel(pred_depths, depths):
+def abs_rel(pred_depths: torch.Tensor, depths: torch.Tensor) -> torch.Tensor:
     # calculate errors only for values for which depths > 0
     errors = torch.where(depths > 0, torch.abs(pred_depths - depths) / (depths), torch.zeros_like(depths))
 
-    # return squared relative errors
+    # return absolute relative errors
     return torch.mean(torch.mean(errors, dim = (1, 2, 3)))
 
 
-def sq_rel(pred_depths, depths):
+def sq_rel(pred_depths: torch.Tensor, depths: torch.Tensor) -> torch.Tensor:
     # calculate errors only for values for which depths > 0
     errors = torch.where(depths > 0, torch.square(pred_depths - depths) / (depths), torch.zeros_like(depths))
 

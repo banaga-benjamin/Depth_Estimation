@@ -1,18 +1,25 @@
 import torch
 import numpy as np
-from os import cpu_count
 
+
+# training constants
+EPOCHS = 1; SEQ_LEN = 4
+BATCH_SIZE = 2; NUM_WORKERS = 0
 
 # constants for image dimensions
 MAX_DEPTH = 80
 HEIGHT = 192; WIDTH = 640
-COST_HEIGHT = 48; COST_WIDTH = 160
 
-# constants for cost volume depths
-USE_SID = True
-COST_DEPTHS = 64
-UID_DEPTHS = np.arange(0.0, 1.0, 1 / COST_DEPTHS)
-SID_DEPTHS = np.array([np.exp(x * np.log(2) / COST_DEPTHS) - 1 for x in range(COST_DEPTHS)])
+
+# constants for cost volumes
+COST_HEIGHT = 96; COST_WIDTH = 320
+
+USE_SID = True; COST_DEPTHS = 80
+UID_DEPTHS = (np.arange(0.0, 1.0, 1 / COST_DEPTHS) + (1 / COST_DEPTHS)) * MAX_DEPTH
+SID_DEPTHS = np.array([np.exp((x + 1) * np.log(2) / COST_DEPTHS) - 1 for x in range(COST_DEPTHS)]) * MAX_DEPTH
+
+DEPTHS = SID_DEPTHS if USE_SID else UID_DEPTHS
+
 
 # intrinsic matrices
 INTRINSIC_MAT = torch.Tensor(
@@ -35,10 +42,3 @@ IMG_INTRINSIC_MAT = INTRINSIC_MAT.clone( )
 IMG_INTRINSIC_MAT[0, :] *= WIDTH
 IMG_INTRINSIC_MAT[1, :] *= HEIGHT
 IMG_INTRINSIC_INV = torch.linalg.pinv(IMG_INTRINSIC_MAT)
-
-# constants related to training
-EPOCHS = 1
-SEQ_LEN = 4
-BATCH_SIZE = 2
-NUM_WORKERS = 0
-NUM_RANDOM_TRANS = 16 - 1

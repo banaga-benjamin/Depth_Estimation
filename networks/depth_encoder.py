@@ -32,8 +32,5 @@ class DepthEncoder(nn.Module):
         preprocess = self.maxpool(self.relu(self.bn1(self.conv1(input))))
 
         # sequentially pass through the residual layers
-        output = self.layer1(preprocess); del preprocess
-        output = self.layer2(output)
-        output = self.layer3(output)
-        output = self.layer4(output)
+        output = self.layer4(self.layer3(self.layer2(self.layer1(preprocess))))
         return output
