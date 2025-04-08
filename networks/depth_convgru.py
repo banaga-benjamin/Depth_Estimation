@@ -40,7 +40,6 @@ class ConvGru(nn.Module):
 
         # save hidden state
         self.prev_state = output.clone( ).detach( )
-            
-        # normalize final output
-        output = (output - output.min( )) / (output.max( ) - output.min( ))
-        return output
+        
+        # normalize final output by passing to sigmoid
+        return functional.sigmoid(output)
