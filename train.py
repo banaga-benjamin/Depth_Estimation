@@ -51,6 +51,7 @@ def train_step(dataloader: DataLoader, encoder: depth_encoder.DepthEncoder, deco
 
             # obtain candidate depths from cost volumes
             candidate_depths = synthesis.depth_from_costs(cost_volumes, num_channels = constants.COST_DEPTHS, sid = constants.USE_SID, device = device)
+            candidate_depths = functional.interpolate(candidate_depths, size = (constants.HEIGHT, constants.WIDTH), mode = "bicubic")
 
             # obtain depth encoder outputs
             encoder_output = encoder(target_img.unsqueeze(dim = 0))
