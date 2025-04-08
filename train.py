@@ -130,7 +130,7 @@ if __name__ == "__main__":
     decoder = depth_decoder.DepthDecoder( ).to(device)
 
     # create optimizer
-    optimizer = torch.optim.Adam(chain(pose.parameters( ), decoder.parameters( ), convgru.parameters( )), lr = 1e-4, weight_decay = 1e-4)
+    optimizer = torch.optim.Adam(chain(pose.parameters( ), decoder.parameters( ), convgru.parameters( )), lr = 1e-4, weight_decay = 1e-5)
 
     # location to save trained networks
     folder = Path("trained_models")
