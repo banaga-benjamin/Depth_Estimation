@@ -25,6 +25,14 @@ class DepthDecoder(nn.Module):
         # initialize combination block
         self.combination_blocks = CombinationBlock( )
 
+        # initialize final refinement layers
+        self.final_refs = nn.ModuleList( )
+        self.final_refs.append(nn.Conv2d(1, 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
+        self.final_refs.append(nn.Conv2d(1, 1, kernel_size = (3, 3), stride = (1, 1), padding = (1, 1)))
+
+        init.kaiming_normal_(self.final_refs[0].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.final_refs[0].bias)
+        init.kaiming_normal_(self.final_refs[1].weight, mode = "fan_in", nonlinearity = "relu"); init.zeros_(self.final_refs[1].bias)
+
 
     def forward(self, input: torch.Tensor, candidate: torch.Tensor):
         # pass inputs through basic blocks
@@ -41,6 +49,10 @@ class DepthDecoder(nn.Module):
 
         # obtain final result by combining final aggregation result with candidate
         final_result = self.combination_blocks(outputs[-1], candidate)
+
+        # upscale final result and pass through refinement layers
+        final_result = functional.interpolate(final_result, scale_factor = 2, mode = "bicubic")
+        final_result = functional.relu(self.final_refs[1](self.final_refs[0](final_result) + final_result))
         return final_result
 
 
