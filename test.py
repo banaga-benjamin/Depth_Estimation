@@ -17,6 +17,12 @@ from torch.utils.data import DataLoader
 
 def test_step(dataloader: DataLoader, encoder: depth_encoder.DepthEncoder, decoder: depth_decoder.DepthDecoder, convgru: depth_convgru.ConvGru,
               pose: posenet.PoseNet, device: str = "cpu") -> None:
+    """
+        evaluates the performance of trained network against ground truth depth maps \n
+        input: dataloader, trained depth encoder, decoder, and convgru networks, trained pose network, and device to store tensors \n
+        output: performance metrics of the trained model
+    """
+
     # initialize error metrics
     cumulative_rmse = 0
     cumulative_rmsle = 0
@@ -28,7 +34,7 @@ def test_step(dataloader: DataLoader, encoder: depth_encoder.DepthEncoder, decod
     print("Number of Batches:", num_batches, "\n")
     for batch, test_batch in enumerate(dataloader):
         # create list of depth outputs
-        depth_outputs_list = list( )
+        depth_output_batch = list( )
 
         img_batch, ground_truth_batch = test_batch
         for img_seq in img_batch:
@@ -42,9 +48,9 @@ def test_step(dataloader: DataLoader, encoder: depth_encoder.DepthEncoder, decod
 
             # synthesize images for computing cost volumes
             synthesized_imgs = [
-                synthesis.synthesize_from_depths(constants.COST_INTRINSIC_MAT.to(device), constants.COST_INTRINSIC_INV.to(device), pose_mats[idx],
-                                                 constants.DEPTHS, constants.COST_WIDTH, constants.COST_HEIGHT, img_seq[idx], device)
-                for idx in range(constants.SEQ_LEN - 1)]
+                synthesis.synthesize_from_depths(constants.COST_INTRINSIC_MAT.to(device), constants.COST_INTRINSIC_INV.to(device), pose_mat,
+                                                 constants.DEPTHS, constants.COST_WIDTH, constants.COST_HEIGHT, src_img, device)
+                for pose_mat, src_img in zip(pose_mats, src_imgs)]
 
              # compute the cost volumes relative to source images
             resized_target_img = functional.interpolate(img_seq[-1].unsqueeze(dim = 0), size = (constants.COST_HEIGHT, constants.COST_WIDTH), mode = "bilinear")
@@ -62,22 +68,17 @@ def test_step(dataloader: DataLoader, encoder: depth_encoder.DepthEncoder, decod
             for candidate_depth in candidate_depths:
                 depth_outputs.append(convgru(decoder(encoder_output, candidate_depth.unsqueeze(dim = 0))))
             depth_outputs = torch.cat(depth_outputs, dim = 0) * constants.MAX_DEPTH
-            depth_outputs_list.append(depth_outputs)
-
-        # preprocess ground truths to align shape with depth outputs
-        ground_truths_list = list( )
-        for idx in range(constants.BATCH_SIZE):
-            ground_truths_list.append(torch.stack([ground_truth_batch[idx]] * (constants.SEQ_LEN - 1)))
+            depth_output_batch.append(depth_outputs[-1])
 
         # note to rescale normalized ground truth to [0, 80]
-        ground_truth_stacked = torch.cat(ground_truths_list, dim = 0) * constants.MAX_DEPTH
-        depth_outputs_stacked = torch.cat(depth_outputs_list, dim = 0)
+        ground_truth_batch *= constants.MAX_DEPTH
+        depth_output_batch = torch.stack(depth_output_batch, dim = 0)
 
         # accumulate error metrics
-        cumulative_rmse += metrics.rmse(depth_outputs_stacked, ground_truth_stacked)
-        cumulative_rmsle += metrics.rmsle(depth_outputs_stacked, ground_truth_stacked)
-        cumulative_sq_rel += metrics.sq_rel(depth_outputs_stacked, ground_truth_stacked)
-        cumulative_abs_rel += metrics.abs_rel(depth_outputs_stacked, ground_truth_stacked)
+        cumulative_rmse += metrics.rmse(depth_output_batch, ground_truth_batch)
+        cumulative_rmsle += metrics.rmsle(depth_output_batch, ground_truth_batch)
+        cumulative_sq_rel += metrics.sq_rel(depth_output_batch, ground_truth_batch)
+        cumulative_abs_rel += metrics.abs_rel(depth_output_batch, ground_truth_batch)
 
         if batch % 500 == 0 and batch != 0: # error logs
             print("batch:", batch)
