@@ -20,6 +20,12 @@ from torch.utils.data import DataLoader
 
 def train_step(dataloader: DataLoader, encoder: depth_encoder.DepthEncoder, decoder: depth_decoder.DepthDecoder,  convgru: depth_convgru.ConvGru,
                pose: posenet.PoseNet, optimizer, device: str = "cpu") -> None:
+    """
+        trains depth encoder, decoder, and convgru networks and pose network \n
+        input: dataloader, depth encoder, decoder, and convgru networks and pose network, an optimizer, and device to store tensors \n
+        output: trained networks saved at 'trained_models' folder
+    """
+
     cumulative_loss = 0
     start_time = time( )
     num_batches = len(dataloader)
@@ -41,9 +47,9 @@ def train_step(dataloader: DataLoader, encoder: depth_encoder.DepthEncoder, deco
 
             # synthesize images for computing cost volumes
             synthesized_imgs = [
-                synthesis.synthesize_from_depths(constants.COST_INTRINSIC_MAT.to(device), constants.COST_INTRINSIC_INV.to(device), pose_mats[idx],
-                                                 constants.DEPTHS, constants.COST_WIDTH, constants.COST_HEIGHT, img_seq[idx], device).detach( )
-                for idx in range(constants.SEQ_LEN - 1)]
+                synthesis.synthesize_from_depths(constants.COST_INTRINSIC_MAT.to(device), constants.COST_INTRINSIC_INV.to(device), pose_mat,
+                                                 constants.DEPTHS, constants.COST_WIDTH, constants.COST_HEIGHT, src_img, device).detach( )
+                for pose_mat, src_img in zip(pose_mats, src_imgs)]
             
             # compute the cost volumes relative to source images
             resized_target_img = functional.interpolate(img_seq[-1].unsqueeze(dim = 0), size = (constants.COST_HEIGHT, constants.COST_WIDTH), mode = "bilinear")
@@ -65,8 +71,8 @@ def train_step(dataloader: DataLoader, encoder: depth_encoder.DepthEncoder, deco
             # synthesize the target image from the source images and final depth predictions
             proj_pixels = torch.stack([
                 synthesis.reproject_from_depth(constants.IMG_INTRINSIC_MAT.to(device), constants.IMG_INTRINSIC_INV.to(device),
-                                               pose_mats[idx], depth_outputs[idx], device = device)
-                for idx in range(constants.SEQ_LEN - 1)], dim = 0)
+                                               pose_mat, depth_output, device = device)
+                for pose_mat, depth_output in zip(pose_mats, depth_outputs)])
 
             output_imgs = synthesis.synthesize(src_imgs, proj_pixels)
 
