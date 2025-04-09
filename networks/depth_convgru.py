@@ -5,6 +5,10 @@ from torch.nn import init
 from torch.nn import functional
 
 class ConvGru(nn.Module):
+    """
+        refines an input depth map using a single convgru cell block
+    """
+    
     def __init__(self, input_size: int = 1, hidden_size: int = 1, kernel_size: tuple[int, ...] | int = (3, 3),
                  stride: tuple[int, ...] | int = (1, 1), padding: tuple[int, ...] | int = (1, 1)):
         super( ).__init__( )

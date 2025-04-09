@@ -5,6 +5,10 @@ from torch.nn import functional
 
 
 class DepthDecoder(nn.Module):
+    """
+        predicts a depth map using multi-scale features and candidate depth map as inputs
+    """
+
     def __init__(self):
         super( ).__init__( )
 
@@ -46,6 +50,10 @@ class DepthDecoder(nn.Module):
 
 
 class BasicBlock(nn.Module):
+    """
+        predicts a depth map at given scale as specified by channels parameter using convolutional layers with residual connections
+    """
+
     def __init__(self, channels: int):
         super( ).__init__( )
 
@@ -71,7 +79,7 @@ class BasicBlock(nn.Module):
 
 
     def forward(self, input: torch.Tensor):
-        # refine, upsamplle. and normalize input
+        # refine, upsample. and normalize input
         output = self.batchnorm(functional.relu(self.ups_layers[0](self.ref_layers[0](input) + input)))
 
         # further refine and upsample input
@@ -80,6 +88,10 @@ class BasicBlock(nn.Module):
 
 
 class UpscaleBlock(nn.Module):
+    """
+        upscales a depth map at a given scale as specified by channels parameter using convolutional layers and residual connections
+    """
+
     def __init__(self, channels: int):
         super( ).__init__( )
     
@@ -104,6 +116,10 @@ class UpscaleBlock(nn.Module):
 
 
 class CombinationBlock(nn.Module):
+    """
+        combines an input depth map and candidate depth map to obtain a final depth map using convolutional layers and residual connections
+    """
+
     def __init__(self):
         super( ).__init__( )
 

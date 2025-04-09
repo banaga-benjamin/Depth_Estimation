@@ -4,6 +4,10 @@ from torchvision import models
 
 
 class PoseNet(nn.Module):
+    """
+        predicts a pose matrix encoded into a vector of size [6] using pretrained ResNet18 as backbone
+    """
+    
     def __init__(self):
         super( ).__init__( )
 

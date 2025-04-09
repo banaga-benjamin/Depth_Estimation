@@ -4,6 +4,10 @@ from torchvision import models
 
 
 class DepthEncoder(nn.Module):
+    """
+        extracts multi-scale features from an input image using pretrained ResNet18
+    """
+    
     def __init__(self):
         super( ).__init__( )
 
