@@ -9,12 +9,14 @@ class ConvGru(nn.Module):
         refines an input depth map using a single convgru cell block
     """
     
-    def __init__(self, input_size: int = 1, hidden_size: int = 1, kernel_size: tuple[int, ...] | int = (3, 3),
+    def __init__(self, input_size: int = 1, hidden_size: int = 1, height: int = 192, width: int = 640, kernel_size: tuple[int, ...] | int = (3, 3),
                  stride: tuple[int, ...] | int = (1, 1), padding: tuple[int, ...] | int = (1, 1)):
         super( ).__init__( )
 
-        # initialize batchnorm, update, reset, and output gates
-        self.batch_norm = nn.BatchNorm2d(input_size + hidden_size)
+        # initialize layernorm layer
+        self.layernorm = nn.LayerNorm([input_size + hidden_size, height, width])
+
+        # initialize update, reset, and output gates
         self.reset_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding)
         self.update_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding)
         self.output_gate = nn.Conv2d(input_size + hidden_size, hidden_size, kernel_size, stride = stride, padding = padding)
@@ -32,7 +34,7 @@ class ConvGru(nn.Module):
         if self.prev_state is None: self.prev_state = torch.zeros_like(input)
 
         # stack inputs and normalize
-        stacked_inputs = self.batch_norm(torch.cat([input, self.prev_state], dim = 1))
+        stacked_inputs = self.layernorm(torch.cat([input, self.prev_state], dim = 1))
 
         # input concatenated features to update and reset gates
         reset = functional.sigmoid(self.reset_gate(stacked_inputs))
