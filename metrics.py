@@ -5,7 +5,7 @@ from torch.nn import functional
 def cost_volumes(target_img: torch.Tensor, synthesized_imgs: torch.Tensor) -> torch.Tensor:
     """
         calculates the cost volumes between a target image and synthesized images \n
-        input:  a target image (C, H, W) and synthesized images (N, C, H, W) \n
+        input: a target image (C, H, W) and synthesized images (N, C, H, W) \n
         output: cost volume between the target image and the synthesized images
     """
 
@@ -21,7 +21,7 @@ def cost_volumes(target_img: torch.Tensor, synthesized_imgs: torch.Tensor) -> to
 def reprojection_error(preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
     """
         calculates the reprojection error between predicted and target images \n
-        input:  predicted images (N, C, H, W) and target images (N, C, H, W) \n
+        input: predicted images (N, C, H, W) and target images (N, C, H, W) \n
         output: reprojection error between predicted and target images
     """
 
