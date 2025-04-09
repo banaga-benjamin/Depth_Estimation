@@ -18,6 +18,12 @@ import torchvision.transforms.functional as tf
 
 def predict(image_data: list[str], encoder: depth_encoder.DepthEncoder, decoder: depth_decoder.DepthDecoder, convgru: depth_convgru.ConvGru,
             pose: posenet.PoseNet, device: str = "cpu") -> None:
+    """
+        predicts depth maps for images with specified file paths using trained network \n
+        input: list of image paths, trained depth encoder, decoder, and convgru networks, trained pose network, and device to store tensors \n
+        output: depth map of images saved in the same folder as the images
+    """
+
     for idx in range(len(image_data) - constants.SEQ_LEN + 1):
         print("processed:", image_data[idx + constants.SEQ_LEN - 1])    # pseudo log
 
@@ -42,9 +48,9 @@ def predict(image_data: list[str], encoder: depth_encoder.DepthEncoder, decoder:
 
         # synthesize images for computing cost volumes
         synthesized_imgs = [
-            synthesis.synthesize_from_depths(constants.COST_INTRINSIC_MAT.to(device), constants.COST_INTRINSIC_INV.to(device), pose_mats[idx],
-                                                constants.DEPTHS, constants.COST_WIDTH, constants.COST_HEIGHT, img_seq[idx], device)
-            for idx in range(constants.SEQ_LEN - 1)]
+            synthesis.synthesize_from_depths(constants.COST_INTRINSIC_MAT.to(device), constants.COST_INTRINSIC_INV.to(device), pose_mat,
+                                                constants.DEPTHS, constants.COST_WIDTH, constants.COST_HEIGHT, src_img, device)
+            for pose_mat, src_img in zip(pose_mats, src_imgs)]
 
          # compute the cost volumes relative to source images
         resized_target_img = functional.interpolate(img_seq[-1].unsqueeze(dim = 0), size = (constants.COST_HEIGHT, constants.COST_WIDTH), mode = "bilinear")
