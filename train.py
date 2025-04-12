@@ -86,7 +86,7 @@ def train_step(dataloader: DataLoader, encoder: depth_encoder.DepthEncoder, deco
 
             # update overall loss
             overall_loss += torch.mean(torch.mean(output_reprojection / torch.exp(src_reprojection + 1e-6), dim = (2, 3)))
-            overall_loss += 1e-3 * regularization_term
+            overall_loss += 0.5 * regularization_term
 
             # for logging
             cumulative_loss += torch.mean(torch.mean(output_reprojection, dim = (1, 2, 3))).item( )
