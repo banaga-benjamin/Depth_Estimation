@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 from torch import nn
 from torch.nn import init
 from torch.nn import functional
@@ -48,4 +47,5 @@ class ConvGru(nn.Module):
         self.prev_state = output.clone( ).detach( )
         
         # normalize final output by passing to sigmoid
-        return functional.sigmoid(output)
+        return functional.sigmoid(torch.e * output)
+    
