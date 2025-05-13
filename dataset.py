@@ -4,41 +4,33 @@ import torchvision.transforms.functional as tf
 
 from PIL import Image
 from pathlib import Path
+from collections import defaultdict
 
 
 class TrainingData(Dataset):
-    def __init__(self, seq_len: int, device: str = "cpu", image_path: str | Path = "kitti_data"):
+    def __init__(self, seq_len: int, device: str = "cpu", train_root: str | Path = "kitti_data"):
         self.device = device
         self.seq_len = seq_len
 
-        # convert image path to path object
-        image_path = Path(image_path)
+        # convert dataset root to path object
+        train_root = Path(train_root)
 
-        # training data roots
-        data_roots = ["2011_09_26", "2011_09_28", "2011_09_29", "2011_09_30"]
+        # read filepaths from dataset_splits/train_files.txt
+        with open("dataset_splits/train_files.txt") as train_files:
+            contents = train_files.read( )
+            list_contents = contents.split("\n")
 
-        # get subdirectories of training data roots
-        data_subdirectories = { }
-        for data_root in data_roots:
-            if not (image_path / data_root).is_dir( ): continue
-
-            data_subdirectories[data_root] = list( )
-            for subdirectory in (image_path / data_root).iterdir( ):
-                if subdirectory.is_dir( ): data_subdirectories[data_root].append(subdirectory)
-
-        # get file paths of training data images
-        temp_image_paths = { }
-        for subdirectories in data_subdirectories.values( ):
-            for subdirectory in subdirectories:
-                temp_image_paths[subdirectory] = list( )
-                for img in (subdirectory / "image_02/data").iterdir( ):
-                    if img.suffix == ".png": temp_image_paths[subdirectory].append(img)
-
-        # collect adjacent image paths as specified by seq len
+            # group files according to directory
+            grouped_content = defaultdict(list)
+            for content in list_contents:
+                train_dir, file_name = content.split(" ")
+                if not (train_root / train_dir / (file_name + ".png")).is_file( ): continue
+                grouped_content[train_dir].append(train_root / train_dir / (file_name + ".png"))
+        
         image_paths = list( )
-        for image_path_list in temp_image_paths.values( ):
-            for idx in range(0, len(image_path_list) - seq_len + 1):
-                image_paths.append(image_path_list[idx: idx + seq_len])
+        for files in grouped_content.values( ):
+            for idx in range(len(files) - seq_len + 1):
+                image_paths.append(files[idx: idx + seq_len])
         self.image_paths = image_paths
 
 
@@ -69,56 +61,43 @@ class TrainingData(Dataset):
 
 
 class TestingData(Dataset):
-    def __init__(self, seq_len: int, device: str = "cpu", image_path: str | Path = "kitti_data", depth_path: str | Path = "data_depth_annotated"):
+    def __init__(self, seq_len: int, device: str = "cpu", test_root: str | Path = "kitti_data", depth_root: str | Path = "data_depth_annotated"):
         self.device = device
         self.seq_len = seq_len
-    
-        # set training data subdirectories
-        image_path = Path(image_path)
-        depth_path = Path(depth_path)
 
-        # testing data roots
-        data_roots = ["2011_10_03"]
+        # convert dataset roots to path objects
+        test_root = Path(test_root)
+        depth_root = Path(depth_root)
 
-        # get subdirectories of testing data roots
-        image_subdirectories = { }
-        depth_subdirectories = { }
-        for data_root in data_roots:
-            if not (image_path / data_root).is_dir( ): continue
-            if not (depth_path / data_root).is_dir( ): continue
-            
-            image_subdirectories[data_root] = list( )
-            depth_subdirectories[data_root] = list( )
-            for image_subdirectory, depth_subdirectory in zip((image_path / data_root).iterdir( ), (depth_path / data_root).iterdir( )):
-                if image_subdirectory.is_dir( ) and depth_subdirectory.is_dir( ):
-                    image_subdirectories[data_root].append(image_subdirectory)
-                    depth_subdirectories[data_root].append(depth_subdirectory)
+        # read filepaths from dataset_splits/test_files.txt
+        with open("dataset_splits/test_files.txt") as test_files:
+            # read filepaths from dataset_splits/depth_files.txt
+            with open("dataset_splits/depth_files.txt") as depth_files:
+                test_contents = test_files.read( )
+                depth_contents = depth_files.read( )
 
-        # get file paths of testing data images and depths
-        temp_image_paths = { }
-        temp_depth_paths = { }
-        for image_subs, depth_subs in zip(image_subdirectories.values( ), depth_subdirectories.values( )):
-            for image_sub, depth_sub in zip(image_subs, depth_subs):
-                temp_image_paths[image_sub] = list( )
-                temp_depth_paths[depth_sub] = list( )
+                test_list_contents = test_contents.split("\n")
+                depth_list_contents = depth_contents.split("\n")
 
-                for img in (image_sub / "image_02/data").iterdir( ):
-                    if img.suffix != ".png": continue
-                    temp_image_paths[image_sub].append(img)
-                for depth in (depth_sub / "proj_depth/groundtruth/image_02").iterdir( ):
-                    if depth.suffix != ".png": continue
-                    temp_depth_paths[depth_sub].append(depth)
+                # group files according to directory
+                grouped_img_content = defaultdict(list)
+                grouped_depth_content = defaultdict(list)
+                for test_content, depth_content in zip(test_list_contents, depth_list_contents):
+                    test_dir, test_file_name = test_content.split(" ")
+                    depth_dir, depth_file_name = depth_content.split(" ")
 
-                # for alignment
-                temp_image_paths[image_sub] = temp_image_paths[image_sub][5:-5]
+                    if not (test_root / test_dir / (test_file_name + ".png")).is_file( ): continue
+                    if not (depth_root / depth_dir / (depth_file_name + ".png")).is_file( ): continue
+
+                    grouped_img_content[test_dir].append(test_root / test_dir / (test_file_name + ".png"))
+                    grouped_depth_content[depth_dir].append(depth_root / depth_dir / (depth_file_name + ".png"))
         
-        image_paths = list( )
-        depth_paths = list( )
-        for image_path_list, depth_path_list in zip(temp_image_paths.values( ), temp_depth_paths.values( )):
-            for idx in range(0, len(image_path_list) - seq_len + 1):
-                image_paths.append(image_path_list[idx: idx + seq_len])
-            for idx in range(0, len(depth_path_list) - seq_len + 1):
-                depth_paths.append(depth_path_list[idx + seq_len - 1])
+        image_paths = list( ); depth_paths = list( )
+        for img_files, depth_files in zip(grouped_img_content.values( ), grouped_depth_content.values( )):
+            for idx in range(len(img_files) - seq_len + 1):
+                image_paths.append(img_files[idx: idx + seq_len])
+            for idx in range(len(depth_files) - seq_len + 1):
+                depth_paths.append(depth_files[idx + seq_len - 1])
         self.image_paths = image_paths
         self.depth_paths = depth_paths
 
