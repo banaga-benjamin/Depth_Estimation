@@ -80,14 +80,14 @@ def test_step(dataloader: DataLoader, encoder: depth_encoder.DepthEncoder, decod
         cumulative_sq_rel += metrics.sq_rel(depth_output_batch, ground_truth_batch)
         cumulative_abs_rel += metrics.abs_rel(depth_output_batch, ground_truth_batch)
 
-        if batch % 500 == 0 and batch != 0: # error logs
+        if batch % 50 == 0 and batch != 0: # error logs
             print("batch:", batch)
             print("rmse:", (cumulative_rmse / batch).item( ))
             print("rmsle:", (cumulative_rmsle / batch).item( ))
             print("sq rel:", (cumulative_sq_rel / batch).item( ))
             print("abs rel:", (cumulative_abs_rel / batch).item( )); print( )
 
-        if batch % 1000 == 0 and batch != 0:
+        if batch % 100 == 0 and batch != 0:
             elapsed_time = (time( ) - start_time)
 
             print("batches completed:", batch)
@@ -102,6 +102,7 @@ def test_step(dataloader: DataLoader, encoder: depth_encoder.DepthEncoder, decod
     print("Abs Rel:\t", (cumulative_abs_rel / num_batches).item( ))
     print("-" * 50)
 
+    elapsed_time = (time( ) - start_time)
     print("\ntime elapsed:", elapsed_time / 60, "minutes")
 
 
